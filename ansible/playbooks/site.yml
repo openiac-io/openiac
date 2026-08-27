@@ -1,0 +1,20 @@
+---
+- name: OpenIaC - Base OS Configuration
+  hosts: all
+  become: yes
+  roles:
+    - base_os
+
+- name: OpenIaC - Kubernetes Deployment
+  hosts: k8s_cluster
+  become: yes
+  tags: ['k8s']
+  roles:
+    - k3s
+
+- name: OpenIaC - OpenStack Deployment
+  hosts: openstack_compute
+  become: yes
+  tags: ['openstack']
+  # roles:
+  #   - openstack_compute

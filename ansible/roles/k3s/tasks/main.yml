@@ -1,0 +1,101 @@
+---
+# tasks file for k3s role
+
+- name: Group tasks by Air-gapped vs Online mode
+  block:
+    
+    # ==========================================
+    # [ENTERPRISE] AIR-GAPPED (OFFLINE) INSTALL
+    # ==========================================
+    - name: "[Offline] Ensure K3s images directory exists"
+      file:
+        path: /var/lib/rancher/k3s/agent/images/
+        state: directory
+        mode: '0755'
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Copy K3s air-gap images tarball to nodes"
+      copy:
+        src: "../../packager/artifacts/images/k3s-airgap-images-amd64.tar"
+        dest: /var/lib/rancher/k3s/agent/images/k3s-airgap-images-amd64.tar
+        mode: '0644'
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Copy K3s binary to nodes"
+      copy:
+        src: "../../packager/artifacts/binaries/k3s"
+        dest: /usr/local/bin/k3s
+        mode: '0755'
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Copy K3s install script to nodes"
+      copy:
+        src: "../../packager/artifacts/binaries/install.sh"
+        dest: /tmp/k3s-install.sh
+        mode: '0755'
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Install K3s Control Plane (Server)"
+      command: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_DOWNLOAD: "true"
+      when: 
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['control_plane']
+      register: offline_install_result
+      changed_when: "'No change' not in offline_install_result.stdout"
+
+    # ==========================================
+    # [COMMUNITY] ONLINE INSTALL
+    # ==========================================
+    - name: "[Online] Download K3s install script"
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install-online.sh
+        mode: '0755'
+      when: not airgapped_mode | default(false) | bool
+
+    - name: "[Online] Install K3s Control Plane (Server)"
+      command: /tmp/k3s-install-online.sh
+      when: 
+        - not airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['control_plane']
+      register: online_install_result
+      changed_when: "'No change' not in online_install_result.stdout"
+
+  # Error handling / always blocks can go here
+  always:
+    - name: Clean up temporary install scripts
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/k3s-install.sh
+        - /tmp/k3s-install-online.sh
+      ignore_errors: yes
+
+# ==========================================
+# POST-INSTALL CONFIGURATION
+# ==========================================
+- name: Ensure .kube directory exists for root
+  file:
+    path: /root/.kube
+    state: directory
+    mode: '0755'
+  when: inventory_hostname in groups['control_plane']
+
+- name: Copy kubeconfig to root directory
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /root/.kube/config
+    remote_src: yes
+    mode: '0600'
+  when: inventory_hostname in groups['control_plane']
+
+- name: Wait for K3s node to be ready
+  command: k3s kubectl get nodes
+  register: kubectl_get_nodes
+  until: "' Ready ' in kubectl_get_nodes.stdout"
+  retries: 10
+  delay: 10
+  when: inventory_hostname in groups['control_plane']

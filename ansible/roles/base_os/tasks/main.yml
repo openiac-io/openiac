@@ -1,0 +1,29 @@
+---
+# tasks file for base_os
+
+- name: Ping the host
+  ping:
+
+- name: Disable Swap (Required for K8s)
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  tags: ['prep']
+
+- name: Remove swap from fstab
+  mount:
+    name: "{{ item }}"
+    fstype: swap
+    state: absent
+  with_items:
+    - swap
+    - none
+  tags: ['prep']
+
+- name: Load necessary kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  tags: ['kernel']

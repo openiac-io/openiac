@@ -1,0 +1,40 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ansible specific
+*.retry
+*.vault
+ansible.log
+group_vars/all.yml.bak
+
+# SSH keys and certs
+*.pem
+*.key
+*.pub
+private_keys/
+certs/
+
+# Packager Artifacts (Air-gapped)
+# VERY IMPORTANT: Do not commit large tarballs or image dumps to Git
+packager/artifacts/
+packager/downloads/
+*.tar.gz
+*.tar
+*.iso
+*.img
+
+# Temp and Logs
+tmp/
+*.log
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
