@@ -38,3 +38,7 @@ tmp/
 .vscode/
 *.swp
 *.swo
+
+# Vagrant specific
+.vagrant/
+Vagrantfile.local

@@ -1,0 +1,48 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# ==============================================================================
+# OpenIaC: K3s Cluster Test Environment
+# ==============================================================================
+
+Vagrant.configure("2") do |config|
+  
+  # Use Ubuntu 22.04 LTS as the base OS
+  config.vm.box = "ubuntu/jammy64"
+  
+  # Share the parent 'core' directory to /openiac inside the VMs
+  # This allows the VM to access the ansible scripts and offline artifacts directly.
+  config.vm.synced_folder "../../", "/openiac", type: "virtualbox"
+
+  # Common VirtualBox settings for all nodes
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.cpus = 2
+  end
+
+  # ----------------------------------------------------------------------------
+  # 1. K3s Control Plane Node (cp-01)
+  # ----------------------------------------------------------------------------
+  config.vm.define "cp-01" do |node|
+    node.vm.hostname = "cp-01"
+    # IP matches hosts.ini
+    node.vm.network "private_network", ip: "192.168.100.10"
+  end
+
+  # ----------------------------------------------------------------------------
+  # 2. K3s Worker Node 1 (worker-01)
+  # ----------------------------------------------------------------------------
+  config.vm.define "worker-01" do |node|
+    node.vm.hostname = "worker-01"
+    node.vm.network "private_network", ip: "192.168.100.20"
+  end
+
+  # ----------------------------------------------------------------------------
+  # 3. K3s Worker Node 2 (worker-02)
+  # ----------------------------------------------------------------------------
+  config.vm.define "worker-02" do |node|
+    node.vm.hostname = "worker-02"
+    node.vm.network "private_network", ip: "192.168.100.21"
+  end
+
+end
