@@ -16,21 +16,21 @@
 
     - name: "[Offline] Copy K3s air-gap images tarball to nodes"
       copy:
-        src: "../../packager/artifacts/images/k3s-airgap-images-amd64.tar"
+        src: "../../packager/artifacts/k3s/k3s-airgap-images-{{ k3s_version | default('v1.28.4+k3s2') }}-amd64.tar"
         dest: /var/lib/rancher/k3s/agent/images/k3s-airgap-images-amd64.tar
         mode: '0644'
       when: airgapped_mode | default(false) | bool
 
     - name: "[Offline] Copy K3s binary to nodes"
       copy:
-        src: "../../packager/artifacts/binaries/k3s"
+        src: "../../packager/artifacts/k3s/k3s-{{ k3s_version | default('v1.28.4+k3s2') }}"
         dest: /usr/local/bin/k3s
         mode: '0755'
       when: airgapped_mode | default(false) | bool
 
     - name: "[Offline] Copy K3s install script to nodes"
       copy:
-        src: "../../packager/artifacts/binaries/install.sh"
+        src: "../../packager/artifacts/k3s/install.sh"
         dest: /tmp/k3s-install.sh
         mode: '0755'
       when: airgapped_mode | default(false) | bool
@@ -41,7 +41,7 @@
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
       when: 
         - airgapped_mode | default(false) | bool
-        - inventory_hostname in groups['control_plane']
+        - inventory_hostname in groups['k8s_control_plane']
       register: offline_install_result
       changed_when: "'No change' not in offline_install_result.stdout"
 
@@ -57,9 +57,11 @@
 
     - name: "[Online] Install K3s Control Plane (Server)"
       command: /tmp/k3s-install-online.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.28.4+k3s2') }}"
       when: 
         - not airgapped_mode | default(false) | bool
-        - inventory_hostname in groups['control_plane']
+        - inventory_hostname in groups['k8s_control_plane']
       register: online_install_result
       changed_when: "'No change' not in online_install_result.stdout"
 
@@ -82,7 +84,7 @@
     path: /root/.kube
     state: directory
     mode: '0755'
-  when: inventory_hostname in groups['control_plane']
+  when: inventory_hostname in groups['k8s_control_plane']
 
 - name: Copy kubeconfig to root directory
   copy:
@@ -90,7 +92,7 @@
     dest: /root/.kube/config
     remote_src: yes
     mode: '0600'
-  when: inventory_hostname in groups['control_plane']
+  when: inventory_hostname in groups['k8s_control_plane']
 
 - name: Wait for K3s node to be ready
   command: k3s kubectl get nodes
@@ -98,4 +100,4 @@
   until: "' Ready ' in kubectl_get_nodes.stdout"
   retries: 10
   delay: 10
-  when: inventory_hostname in groups['control_plane']
+  when: inventory_hostname in groups['k8s_control_plane']
