@@ -65,6 +65,51 @@
       register: online_install_result
       changed_when: "'No change' not in online_install_result.stdout"
 
+    # ==========================================
+    # WORKER NODE JOIN LOGIC
+    # ==========================================
+    - name: Wait for K3s token file to be generated on Control Plane
+      wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      run_once: true
+
+    - name: Extract K3s node token from Control Plane
+      command: cat /var/lib/rancher/k3s/server/node-token
+      register: k3s_token_output
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      run_once: true
+      changed_when: false
+
+    - name: Set k3s_token fact
+      set_fact:
+        k3s_token: "{{ k3s_token_output.stdout.strip() }}"
+      run_once: true
+
+    - name: "[Offline] Install K3s Worker (Agent)"
+      command: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_DOWNLOAD: "true"
+        K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
+        K3S_TOKEN: "{{ k3s_token }}"
+      when: 
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['k8s_workers']
+      register: offline_worker_result
+      changed_when: "'No change' not in offline_worker_result.stdout"
+
+    - name: "[Online] Install K3s Worker (Agent)"
+      command: /tmp/k3s-install-online.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.28.4+k3s2') }}"
+        K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
+        K3S_TOKEN: "{{ k3s_token }}"
+      when: 
+        - not airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['k8s_workers']
+      register: online_worker_result
+      changed_when: "'No change' not in online_worker_result.stdout"
+
   # Error handling / always blocks can go here
   always:
     - name: Clean up temporary install scripts
