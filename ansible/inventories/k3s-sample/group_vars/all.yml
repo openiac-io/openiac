@@ -14,11 +14,11 @@ airgapped_mode: true
 # 2. Kubernetes (K3s) Configuration
 # ------------------------------------------------------------------------------
 # The specific version of K3s to install.
-# If airgapped_mode=true, the tarball/binary for this exact version must exist.
-# Example versions: "v1.28.4+k3s2", "v1.27.8+k3s2"
+# You can use ANY valid K3s release tag from the official GitHub releases page:
+# 👉 https://github.com/k3s-io/k3s/releases
+#
+# Note: Ensure the version string exactly matches the GitHub tag (e.g., v1.28.4+k3s2)
+# If airgapped_mode=true, the offline artifacts for this exact version must exist.
 k3s_version: "v1.28.4+k3s2"
 
-# ------------------------------------------------------------------------------
-# 3. OpenStack Configuration (Example)
-# ------------------------------------------------------------------------------
-# openstack_version: "zed" # yoga, zed, antelope
+
