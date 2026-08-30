@@ -1,34 +1,61 @@
 #!/bin/bash
 # ==============================================================================
-# OpenIaC Offline Packager
+# OpenIaC Modular Offline Packager
 # ==============================================================================
-# This script must be run on an internet-connected machine.
-# It collects required RPM/DEB packages, Docker images, and Helm charts,
-# and bundles them into a single offline-images.tar.gz for air-gapped deployment.
+# 이 스크립트는 모듈형 아키텍처로 설계되었습니다.
+# --target 옵션을 통해 K3s, OpenStack 등 원하는 솔루션의 오프라인 패키지를 생성합니다.
 
 set -e
 
+# 기본 변수 설정
+TARGET=""
+VERSION=""
 ARTIFACT_DIR="artifacts"
-IMAGE_LIST="image_list.txt"
-TARBALL_NAME="openiac-offline-v1.0.tar.gz"
 
-echo "🚀 Starting OpenIaC Offline Artifact Collection..."
+# 인자값(Arguments) 파싱
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --target) TARGET="$2"; shift ;;
+        --version) VERSION="$2"; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
 
-mkdir -p $ARTIFACT_DIR/images
-mkdir -p $ARTIFACT_DIR/binaries
-mkdir -p $ARTIFACT_DIR/charts
+# target 검증
+if [ -z "$TARGET" ]; then
+    echo "================================================================"
+    echo "❌ Error: Target is required!"
+    echo "Usage: $0 --target <solution_name> [--version <version>]"
+    echo "Example: $0 --target k3s --version v1.28.4+k3s2"
+    echo "================================================================"
+    exit 1
+fi
 
-# TODO: Add logic to parse Ansible variables for dynamic image lists
-echo "[1/3] Pulling and saving container images..."
-# Example:
-# docker pull k8s.gcr.io/pause:3.6
-# docker save k8s.gcr.io/pause:3.6 -o $ARTIFACT_DIR/images/pause.tar
+SCRIPT_PATH="scripts/${TARGET}.sh"
 
-echo "[2/3] Downloading required binaries and Helm charts..."
-# Example:
-# wget https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz -O $ARTIFACT_DIR/binaries/helm.tar.gz
+if [ ! -f "$SCRIPT_PATH" ]; then
+    echo "❌ Error: Packager module for '$TARGET' not found at $SCRIPT_PATH"
+    exit 1
+fi
 
-echo "[3/3] Compressing artifacts into $TARBALL_NAME..."
-# tar -czvf $TARBALL_NAME $ARTIFACT_DIR/
+echo "🚀 Starting OpenIaC Offline Artifact Collection for: [ $TARGET ]"
 
-echo "✅ Artifact creation complete! Transfer $TARBALL_NAME to your air-gapped environment."
+# 1. 솔루션별 모듈 스크립트 실행 (다운로드 위임)
+bash "$SCRIPT_PATH" "$VERSION" "$ARTIFACT_DIR"
+
+# 2. 결과물 압축
+TARBALL_NAME="openiac-${TARGET}-offline.tar.gz"
+if [ -n "$VERSION" ]; then
+    TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}.tar.gz"
+fi
+
+echo "📦 Compressing artifacts into $TARBALL_NAME..."
+# 선택한 타겟의 폴더만 압축 (예: artifacts/k3s)
+tar -czf "$TARBALL_NAME" "$ARTIFACT_DIR/$TARGET"
+
+echo "================================================================"
+echo "✅ Artifact creation complete!"
+echo "📁 Output: $(pwd)/$TARBALL_NAME"
+echo "💡 To use offline, extract this tarball in the OpenIaC packager directory."
+echo "================================================================"

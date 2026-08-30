@@ -39,6 +39,7 @@
       command: /tmp/k3s-install.sh
       environment:
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
+        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }}"
       when: 
         - airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_control_plane']
@@ -59,6 +60,7 @@
       command: /tmp/k3s-install-online.sh
       environment:
         INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.28.4+k3s2') }}"
+        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }}"
       when: 
         - not airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_control_plane']
@@ -92,6 +94,7 @@
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
         K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
         K3S_TOKEN: "{{ k3s_token }}"
+        INSTALL_K3S_EXEC: "agent --node-ip {{ ansible_host }}"
       when: 
         - airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_workers']
@@ -104,6 +107,7 @@
         INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.28.4+k3s2') }}"
         K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
         K3S_TOKEN: "{{ k3s_token }}"
+        INSTALL_K3S_EXEC: "agent --node-ip {{ ansible_host }}"
       when: 
         - not airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_workers']
