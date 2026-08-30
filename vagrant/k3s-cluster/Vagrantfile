@@ -9,9 +9,9 @@
 # 🐧 OS Selection (Choose your target environment)
 # ------------------------------------------------------------------------------
 # Options: 
-# - "ubuntu/jammy64" (Ubuntu 22.04 LTS) -> Popular for modern SaaS/Tech
-# - "rockylinux/9"   (Rocky Linux 9)    -> Enterprise standard for Air-gapped
-TARGET_OS = "ubuntu/jammy64"
+# - "ubuntu/jammy64"     (Ubuntu 22.04 LTS) -> Popular for modern SaaS/Tech
+# - "bento/rockylinux-9" (Rocky Linux 9)    -> Enterprise standard for Air-gapped
+TARGET_OS = "bento/rockylinux-9"
 
 Vagrant.configure("2") do |config|
   
