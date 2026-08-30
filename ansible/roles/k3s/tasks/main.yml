@@ -39,7 +39,7 @@
       command: /tmp/k3s-install.sh
       environment:
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
-        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }}"
+        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }} --write-kubeconfig-mode 644"
       when: 
         - airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_control_plane']
@@ -60,12 +60,23 @@
       command: /tmp/k3s-install-online.sh
       environment:
         INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.28.4+k3s2') }}"
-        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }}"
+        INSTALL_K3S_EXEC: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }} --write-kubeconfig-mode 644"
       when: 
         - not airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_control_plane']
       register: online_install_result
       changed_when: "'No change' not in online_install_result.stdout"
+
+    # ==========================================
+    # VERIFY MASTER IS READY BEFORE JOINING WORKERS
+    # ==========================================
+    - name: Wait for K3s Control Plane to be ready
+      command: /usr/local/bin/k3s kubectl get nodes
+      register: kubectl_get_nodes
+      until: "' Ready ' in kubectl_get_nodes.stdout"
+      retries: 20
+      delay: 15
+      when: inventory_hostname in groups['k8s_control_plane']
 
     # ==========================================
     # WORKER NODE JOIN LOGIC
@@ -143,10 +154,34 @@
     mode: '0600'
   when: inventory_hostname in groups['k8s_control_plane']
 
-- name: Wait for K3s node to be ready
-  command: k3s kubectl get nodes
-  register: kubectl_get_nodes
-  until: "' Ready ' in kubectl_get_nodes.stdout"
-  retries: 10
-  delay: 10
-  when: inventory_hostname in groups['k8s_control_plane']
+- name: Ensure .kube directory exists for ansible_user
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  when: 
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user != "root"
+
+- name: Copy kubeconfig to ansible_user directory
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  when: 
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user != "root"
+
+- name: Export KUBECONFIG in ansible_user bashrc
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: "export KUBECONFIG=~/.kube/config"
+    create: yes
+  when: 
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user != "root"

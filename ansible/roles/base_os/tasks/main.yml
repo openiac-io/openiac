@@ -27,3 +27,26 @@
     - overlay
     - br_netfilter
   tags: ['kernel']
+
+- name: Disable firewalld (RedHat/Rocky)
+  systemd:
+    name: firewalld
+    state: stopped
+    enabled: no
+  ignore_errors: true
+  when: ansible_os_family == "RedHat"
+
+- name: Set SELinux to permissive (RedHat/Rocky)
+  shell: |
+    setenforce 0 || true
+    sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+  ignore_errors: true
+  when: ansible_os_family == "RedHat"
+
+- name: Disable UFW (Ubuntu/Debian)
+  systemd:
+    name: ufw
+    state: stopped
+    enabled: no
+  ignore_errors: true
+  when: ansible_os_family == "Debian"

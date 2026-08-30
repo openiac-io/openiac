@@ -2,17 +2,17 @@
 # ==============================================================================
 # OpenIaC Modular Offline Packager
 # ==============================================================================
-# 이 스크립트는 모듈형 아키텍처로 설계되었습니다.
-# --target 옵션을 통해 K3s, OpenStack 등 원하는 솔루션의 오프라인 패키지를 생성합니다.
+# This script is designed with a modular architecture for true Air-gapped deployments.
+# Use the --target option to generate offline packages for specific solutions (e.g., k3s, openstack).
 
 set -e
 
-# 기본 변수 설정
+# Default configurations
 TARGET=""
 VERSION=""
 ARTIFACT_DIR="artifacts"
 
-# 인자값(Arguments) 파싱
+# Argument parsing
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --target) TARGET="$2"; shift ;;
@@ -22,7 +22,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# target 검증
+# Validate target
 if [ -z "$TARGET" ]; then
     echo "================================================================"
     echo "❌ Error: Target is required!"
@@ -41,17 +41,17 @@ fi
 
 echo "🚀 Starting OpenIaC Offline Artifact Collection for: [ $TARGET ]"
 
-# 1. 솔루션별 모듈 스크립트 실행 (다운로드 위임)
+# 1. Execute the solution-specific module script (Delegates download logic)
 bash "$SCRIPT_PATH" "$VERSION" "$ARTIFACT_DIR"
 
-# 2. 결과물 압축
+# 2. Compress the downloaded artifacts
 TARBALL_NAME="openiac-${TARGET}-offline.tar.gz"
 if [ -n "$VERSION" ]; then
     TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}.tar.gz"
 fi
 
 echo "📦 Compressing artifacts into $TARBALL_NAME..."
-# 선택한 타겟의 폴더만 압축 (예: artifacts/k3s)
+# Archive ONLY the specific target directory (e.g., artifacts/k3s)
 tar -czf "$TARBALL_NAME" "$ARTIFACT_DIR/$TARGET"
 
 echo "================================================================"
