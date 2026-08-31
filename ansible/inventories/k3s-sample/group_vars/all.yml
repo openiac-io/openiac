@@ -18,7 +18,4 @@ airgapped_mode: true
 # Example versions: "v1.28.4+k3s2", "v1.27.8+k3s2"
 k3s_version: "v1.28.4+k3s2"
 
-# ------------------------------------------------------------------------------
-# 3. OpenStack Configuration (Example)
-# ------------------------------------------------------------------------------
-# openstack_version: "zed" # yoga, zed, antelope
+
