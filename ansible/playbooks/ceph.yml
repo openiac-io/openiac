@@ -1,0 +1,7 @@
+---
+- name: OpenIaC Ceph Cluster Provisioning
+  hosts: physical_nodes
+  become: true
+  roles:
+    - base_os
+    - ceph

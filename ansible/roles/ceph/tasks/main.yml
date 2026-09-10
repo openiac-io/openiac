@@ -1,0 +1,73 @@
+---
+# ==============================================================================
+# OpenIaC Ceph Orchestration Role (cephadm)
+# ==============================================================================
+
+- name: Check if Ceph is already bootstrapped
+  stat:
+    path: /etc/ceph/ceph.conf
+  register: ceph_conf
+
+- name: Install Podman (Required for Cephadm)
+  package:
+    name: podman
+    state: present
+
+# ------------------------------------------------------------------------------
+# Online Mode (Internet Access)
+# ------------------------------------------------------------------------------
+- name: (Online) Install cephadm via DNF
+  package:
+    name: cephadm
+    state: present
+  when: not airgapped_mode
+
+# ------------------------------------------------------------------------------
+# Air-gapped Mode (Offline)
+# ------------------------------------------------------------------------------
+- name: (Air-gapped) Copy cephadm binary
+  copy:
+    src: "../../../packager/artifacts/ceph/cephadm"
+    dest: "/usr/local/bin/cephadm"
+    mode: '0755'
+  when: airgapped_mode
+
+- name: (Air-gapped) Copy Ceph container image tarball
+  copy:
+    src: "../../../packager/artifacts/ceph/ceph-image.tar"
+    dest: "/tmp/ceph-image.tar"
+  when: airgapped_mode
+
+- name: (Air-gapped) Load Ceph container image into Podman
+  command: podman load -i /tmp/ceph-image.tar
+  when: airgapped_mode
+
+# ------------------------------------------------------------------------------
+# Ceph Cluster Bootstrap
+# ------------------------------------------------------------------------------
+- name: Bootstrap Ceph cluster on the first monitor node
+  command: >
+    cephadm bootstrap
+    --mon-ip {{ ansible_host }}
+    --cluster-network {{ ceph_cluster_network }}
+    --allow-fqdn-hostname
+    --initial-dashboard-password admin
+  when: 
+    - inventory_hostname == groups['ceph_mons'][0]
+    - not ceph_conf.stat.exists
+
+# ------------------------------------------------------------------------------
+# Generate Orchestrator Spec for OSDs and other Nodes
+# ------------------------------------------------------------------------------
+- name: Copy Ceph cluster orchestrator spec template
+  template:
+    src: ceph-cluster-spec.yml.j2
+    dest: /tmp/ceph-cluster-spec.yml
+  when: inventory_hostname == groups['ceph_mons'][0]
+
+- name: Apply Ceph Orchestrator Spec
+  command: ceph orch apply -i /tmp/ceph-cluster-spec.yml
+  when: 
+    - inventory_hostname == groups['ceph_mons'][0]
+  # Note: In a real production role, we would wait for the first bootstrap to fully stabilize 
+  # before applying the spec, and ensure SSH keys are distributed to other nodes.
