@@ -1,29 +1,36 @@
 #!/bin/bash
+# ==============================================================================
+# OpenIaC Packager: K3s Offline Artifacts Downloader (RHEL/Rocky 9)
+# ==============================================================================
 set -e
 
-# Arguments passed from main wrapper
-K3S_VERSION=${1:-"v1.28.4+k3s2"}
-ARTIFACT_DIR=$2
+VERSION="${1}"
+ARTIFACT_DIR="${2}"
+TARGET="k3s"
 
-K3S_DIR="$ARTIFACT_DIR/k3s"
+# Default to latest stable if no version specified
+if [ -z "$VERSION" ]; then
+    VERSION="v1.28.4+k3s2"
+fi
 
-# 1. Create artifact directory
-mkdir -p "$K3S_DIR"
+TARGET_DIR="${ARTIFACT_DIR}/${TARGET}"
+mkdir -p "${TARGET_DIR}"
 
-# 2. Download K3s binary
-echo "  [1/3] Downloading K3s binary ($K3S_VERSION)..."
-curl -L -f --progress-bar "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s" \
-  -o "$K3S_DIR/k3s-${K3S_VERSION}"
-chmod +x "$K3S_DIR/k3s-${K3S_VERSION}"
+echo "[1/3] Downloading K3s binary (${VERSION})..."
+curl -sL --retry 3 "https://github.com/k3s-io/k3s/releases/download/${VERSION}/k3s" -o "${TARGET_DIR}/k3s"
+chmod +x "${TARGET_DIR}/k3s"
 
-# 3. Download K3s air-gap images
-echo "  [2/3] Downloading K3s air-gap images..."
-curl -L -f --progress-bar "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s-airgap-images-amd64.tar" \
-  -o "$K3S_DIR/k3s-airgap-images-${K3S_VERSION}-amd64.tar"
+echo "[2/3] Downloading K3s air-gap container images..."
+curl -sL --retry 3 "https://github.com/k3s-io/k3s/releases/download/${VERSION}/k3s-airgap-images-amd64.tar" -o "${TARGET_DIR}/k3s-airgap-images-amd64.tar"
 
-# 4. Download K3s official install script
-echo "  [3/3] Downloading K3s install script..."
-curl -L -f -s "https://get.k3s.io" -o "$K3S_DIR/install.sh"
-chmod +x "$K3S_DIR/install.sh"
+echo "[3/3] Downloading offline dependencies (RPM packages) for Rocky Linux 9..."
+mkdir -p "${TARGET_DIR}/rpms"
+# Note: For production use, you should run this command on a fresh Rocky Linux 9 machine 
+# to ensure it resolves and downloads all necessary dependencies.
+if command -v dnf &> /dev/null; then
+    dnf download --resolve --alldeps -y -q --destdir="${TARGET_DIR}/rpms" container-selinux iptables iptables-libs libnetfilter_conntrack libnfnetlink iptables-nft
+else
+    echo "??Warning: 'dnf' command not found. Skipping RPM downloads. (Run this on Rocky Linux to collect RPMs)"
+fi
 
-echo "  ✅ K3s artifacts successfully downloaded to $K3S_DIR!"
+echo "? K3s RHEL/Rocky artifacts collected successfully in ${TARGET_DIR}"
