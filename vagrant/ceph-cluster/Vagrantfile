@@ -1,0 +1,52 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "rockylinux/9"
+
+  # Ceph Node 1
+  config.vm.define "ceph-node1" do |node|
+    node.vm.hostname = "ceph-node1"
+    node.vm.network "private_network", ip: "192.168.60.11"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      # Add a 20GB secondary disk for Ceph OSD (/dev/sdb)
+      file_to_disk = "ceph-node1-osd.vmdk"
+      unless File.exist?(file_to_disk)
+        vb.customize ['createhd', '--filename', file_to_disk, '--size', 20480]
+      end
+      vb.customize ['storageattach', :id, '--storagectl', 'SATA Controller', '--port', 1, '--device', 0, '--type', 'hdd', '--medium', file_to_disk]
+    end
+  end
+
+  # Ceph Node 2
+  config.vm.define "ceph-node2" do |node|
+    node.vm.hostname = "ceph-node2"
+    node.vm.network "private_network", ip: "192.168.60.12"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      file_to_disk = "ceph-node2-osd.vmdk"
+      unless File.exist?(file_to_disk)
+        vb.customize ['createhd', '--filename', file_to_disk, '--size', 20480]
+      end
+      vb.customize ['storageattach', :id, '--storagectl', 'SATA Controller', '--port', 1, '--device', 0, '--type', 'hdd', '--medium', file_to_disk]
+    end
+  end
+
+  # Ceph Node 3
+  config.vm.define "ceph-node3" do |node|
+    node.vm.hostname = "ceph-node3"
+    node.vm.network "private_network", ip: "192.168.60.13"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      file_to_disk = "ceph-node3-osd.vmdk"
+      unless File.exist?(file_to_disk)
+        vb.customize ['createhd', '--filename', file_to_disk, '--size', 20480]
+      end
+      vb.customize ['storageattach', :id, '--storagectl', 'SATA Controller', '--port', 1, '--device', 0, '--type', 'hdd', '--medium', file_to_disk]
+    end
+  end
+end

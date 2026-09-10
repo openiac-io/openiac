@@ -1,0 +1,36 @@
+---
+# Ceph Orchestrator Spec to dynamically add hosts and OSDs
+{% for host in groups['physical_nodes'] %}
+service_type: host
+hostname: {{ host }}
+addr: {{ hostvars[host]['ansible_host'] }}
+---
+{% endfor %}
+
+service_type: mon
+placement:
+  hosts:
+{% for host in groups['ceph_mons'] %}
+    - {{ host }}
+{% endfor %}
+---
+service_type: mgr
+placement:
+  hosts:
+{% for host in groups['ceph_mgrs'] %}
+    - {{ host }}
+{% endfor %}
+---
+service_type: osd
+service_id: default_drive_group
+placement:
+  hosts:
+{% for host in groups['ceph_osds'] %}
+    - {{ host }}
+{% endfor %}
+spec:
+  data_devices:
+    paths:
+{% for device in osd_devices %}
+      - {{ device }}
+{% endfor %}
