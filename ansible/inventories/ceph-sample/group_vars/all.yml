@@ -3,13 +3,23 @@
 # OpenIaC Ceph Variables (ceph-sample)
 # ==============================================================================
 
+
+# ------------------------------------------------------------------------------
+# 🚨 [COMPATIBILITY MATRIX]
+# Please ensure your target bare-metal OS matches the required version below.
+# 
+# [Solution Version]       [Official Target OS Compatibility]
+# - quincy (v17)   ----->  RHEL / Rocky Linux 8.x or 9.x
+# - reef   (v18)   ----->  RHEL / Rocky Linux 8.x or 9.x
+# - squid  (v19)   ----->  RHEL / Rocky Linux 9.x
+# ------------------------------------------------------------------------------
 # Ceph Version & Deployment Settings
 ceph_version: "quincy"            # Target Ceph version (e.g., quincy, reef)
 ceph_network: "192.168.60.0/24"   # Public network for Ceph client traffic
 ceph_cluster_network: "192.168.60.0/24" # Cluster network for OSD replication
 
 # OSD Device configuration
-# Vagrant adds the secondary disk as /dev/sdb on Rocky Linux VirtualBox
+# Vagrant adds the secondary disk as /dev/sdb on RHEL / Rocky Linux VirtualBox
 osd_devices:
   - "/dev/sdb"
 

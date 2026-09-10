@@ -35,9 +35,31 @@ fi
 SCRIPT_PATH="scripts/${TARGET}.sh"
 
 if [ ! -f "$SCRIPT_PATH" ]; then
-    echo "❌ Error: Packager module for '$TARGET' not found at $SCRIPT_PATH"
+    echo "??Error: Packager module for '$TARGET' not found at $SCRIPT_PATH"
     exit 1
 fi
+
+# ==============================================================================
+# [Pre-flight] OS Check
+# ==============================================================================
+# Check if running on a compatible RHEL-based OS (Rocky/Alma/RHEL)
+if [ ! -f "/etc/os-release" ]; then
+    echo "?? ERROR: /etc/os-release not found. This script must be run on a Linux OS."
+    exit 1
+fi
+
+source /etc/os-release
+if [[ "$ID_LIKE" != *"rhel"* ]] && [[ "$ID_LIKE" != *"centos"* ]] && [[ "$ID_LIKE" != *"fedora"* ]]; then
+    echo "?? ERROR: Incompatible OS detected ($ID)."
+    echo "This Packager downloads RPMs for Enterprise Air-gapped environments."
+    echo "Please run this script on a RHEL/Rocky Linux machine matching your target baremetal OS."
+    exit 1
+fi
+
+OS_MAJOR_VERSION=$(echo $VERSION_ID | cut -d'.' -f1)
+echo "? Detected Host OS: $NAME $VERSION_ID (Major: $OS_MAJOR_VERSION)"
+echo "?? IMPORTANT: The artifacts generated here must be deployed to Target Servers running RHEL/Rocky ${OS_MAJOR_VERSION}.x!"
+echo "=============================================================================="
 
 echo "🚀 Starting OpenIaC Offline Artifact Collection for: [ $TARGET ]"
 
@@ -45,9 +67,9 @@ echo "🚀 Starting OpenIaC Offline Artifact Collection for: [ $TARGET ]"
 bash "$SCRIPT_PATH" "$VERSION" "$ARTIFACT_DIR"
 
 # 2. Compress the downloaded artifacts
-TARBALL_NAME="openiac-${TARGET}-offline.tar.gz"
+TARBALL_NAME="openiac-${TARGET}-offline-el${OS_MAJOR_VERSION}.tar.gz"
 if [ -n "$VERSION" ]; then
-    TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}.tar.gz"
+    TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}-el${OS_MAJOR_VERSION}.tar.gz"
 fi
 
 echo "📦 Compressing artifacts into $TARBALL_NAME..."

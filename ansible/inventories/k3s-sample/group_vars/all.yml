@@ -11,6 +11,15 @@
 airgapped_mode: true
 
 # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 🚨 [COMPATIBILITY MATRIX]
+# Please ensure your target bare-metal OS matches the required version below.
+# 
+# [Solution Version]         [Official Target OS Compatibility]
+# - v1.27.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
+# - v1.28.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
+# - v1.29.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
+# ------------------------------------------------------------------------------
 # 2. Kubernetes (K3s) Configuration
 # ------------------------------------------------------------------------------
 # The specific version of K3s to install.
