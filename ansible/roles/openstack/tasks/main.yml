@@ -1,0 +1,132 @@
+---
+# tasks file for openstack role (Kolla-Ansible wrapper)
+
+- name: Group tasks by Air-gapped vs Online mode
+  block:
+    
+    # ==========================================
+    # [ENTERPRISE] AIR-GAPPED (OFFLINE) INSTALL
+    # ==========================================
+    - name: "[Offline] Copy OpenStack Python wheels to bastion node"
+      copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/openstack/python/"
+        dest: "/tmp/kolla-wheels/"
+      when: airgapped_mode | default(false) | bool
+      delegate_to: localhost
+      run_once: true
+
+    - name: "[Offline] Install Kolla-Ansible and OpenStackClient offline on bastion"
+      command: "pip3 install --no-index --find-links=/tmp/kolla-wheels/ kolla-ansible python-openstackclient"
+      when: airgapped_mode | default(false) | bool
+      delegate_to: localhost
+      run_once: true
+
+    # ==========================================
+    # KERNEL & HOST PREPARATION
+    # ==========================================
+    - name: Ensure target hosts have Python3, sshpass, and lvm2 installed
+      dnf:
+        name: 
+          - python3
+          - sshpass
+          - lvm2
+        state: present
+
+    - name: Check if /dev/sdb exists for Cinder
+      stat:
+        path: /dev/sdb
+      register: sdb_disk
+
+    - name: Create Cinder LVM Volume Group (cinder-volumes)
+      lvg:
+        vg: cinder-volumes
+        pvs: /dev/sdb
+      when: sdb_disk.stat.exists
+        
+    - name: Ensure Docker/Podman is installed (Kolla requirement)
+      dnf:
+        name: podman
+        state: present
+
+    - name: Ensure dummy interface for Neutron exists
+      command: ip link add dummy0 type dummy
+      ignore_errors: true
+
+    - name: Ensure dummy interface for Neutron is up
+      command: ip link set dummy0 up
+      ignore_errors: true
+
+    # ==========================================
+    # KOLLA CONFIGURATION (BASTION NODE)
+    # ==========================================
+    - name: Ensure /etc/kolla exists on bastion
+      file:
+        path: /etc/kolla
+        state: directory
+      delegate_to: localhost
+      run_once: true
+
+    - name: Copy Kolla example config files (passwords.yml)
+      command: cp /usr/local/share/kolla-ansible/etc_examples/kolla/passwords.yml /etc/kolla/passwords.yml
+      args:
+        creates: /etc/kolla/passwords.yml
+      delegate_to: localhost
+      run_once: true
+
+    - name: Template Kolla globals.yml
+      template:
+        src: globals.yml.j2
+        dest: /etc/kolla/globals.yml
+      delegate_to: localhost
+      run_once: true
+
+    - name: Generate Kolla passwords (modifies /etc/kolla/passwords.yml)
+      command: /usr/local/bin/kolla-genpwd
+      delegate_to: localhost
+      run_once: true
+
+    - name: "[Offline] Copy Ansible Galaxy Collections to bastion"
+      copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/openstack/collections/"
+        dest: "/tmp/kolla-collections/"
+      when: airgapped_mode | default(false) | bool
+      delegate_to: localhost
+      run_once: true
+
+    - name: "[Offline] Install Kolla-Ansible Galaxy Collections offline"
+      shell: "ansible-galaxy collection install /tmp/kolla-collections/*.tar.gz -p /usr/share/ansible/collections --force"
+      when: airgapped_mode | default(false) | bool
+      delegate_to: localhost
+      run_once: true
+
+    # ==========================================
+    # KOLLA-ANSIBLE DEPLOYMENT
+    # ==========================================
+    - name: Bootstrap servers with Kolla-Ansible
+      command: >
+        /usr/local/bin/kolla-ansible -i {{ inventory_file }} bootstrap-servers
+      delegate_to: localhost
+      run_once: true
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+
+    - name: Run Kolla-Ansible Prechecks
+      command: >
+        /usr/local/bin/kolla-ansible -i {{ inventory_file }} prechecks
+      delegate_to: localhost
+      run_once: true
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+
+    - name: Deploy OpenStack with Kolla-Ansible
+      command: >
+        /usr/local/bin/kolla-ansible -i {{ inventory_file }} deploy
+      delegate_to: localhost
+      run_once: true
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+
+    - name: Generate admin-openrc.sh
+      command: /usr/local/bin/kolla-ansible post-deploy
+      delegate_to: localhost
+      run_once: true
