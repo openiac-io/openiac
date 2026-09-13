@@ -1,0 +1,7 @@
+---
+- name: OpenIaC - OpenStack Kolla-Ansible Deployment
+  hosts: all
+  become: true
+  roles:
+    - role: base_os
+    - role: openstack

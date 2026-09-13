@@ -1,0 +1,6 @@
+quay.io/openstack.kolla/nova-api:2023.2
+quay.io/openstack.kolla/nova-compute:2023.2
+quay.io/openstack.kolla/keystone:2023.2
+quay.io/openstack.kolla/horizon:2023.2
+quay.io/openstack.kolla/mariadb:2023.2
+quay.io/openstack.kolla/rabbitmq:2023.2

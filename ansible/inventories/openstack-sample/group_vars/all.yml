@@ -1,0 +1,25 @@
+---
+# ==============================================================================
+# OpenIaC Global Configuration (OpenStack Kolla-Ansible)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Deployment Mode
+# ------------------------------------------------------------------------------
+airgapped_mode: true
+
+# ------------------------------------------------------------------------------
+# 🚨 [COMPATIBILITY MATRIX]
+# Please ensure your target bare-metal OS matches the required version below.
+# 
+# [Solution Version]         [Official Target OS Compatibility]
+# - Yoga (2022.1)  ----->  RHEL / Rocky Linux 8.x
+# - Bobcat (2023.2)----->  RHEL / Rocky Linux 9.x
+# - Caracal (2024.1)---->  RHEL / Rocky Linux 9.x
+# ------------------------------------------------------------------------------
+# 2. OpenStack Configuration
+# ------------------------------------------------------------------------------
+openstack_version: "2023.2" # Bobcat
+openstack_network_interface: "enp0s8"
+openstack_neutron_external_interface: "dummy0"
+openstack_vip_address: "192.168.100.250" # VIP for HAProxy
