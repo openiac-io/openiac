@@ -1,0 +1,19 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: OpenStack (Kolla-Ansible)
+# ==============================================================================
+# Sensible defaults for zero-config deployment. Override in group_vars/all.yml.
+
+# Air-gapped (Offline) deployment toggle
+airgapped_mode: false
+
+# OpenStack Release (e.g., "2023.2" for Bobcat, "2024.1" for Caracal)
+openstack_version: "2023.2"
+
+# Network interfaces & Virtual IP
+openstack_network_interface: "enp0s8"
+openstack_neutron_external_interface: "dummy0"
+openstack_vip_address: "192.168.100.250"
+
+# Built-in offline local container registry port (automatically started when airgapped_mode is true)
+openstack_local_registry_port: 5000

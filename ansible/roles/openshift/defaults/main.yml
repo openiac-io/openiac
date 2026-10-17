@@ -1,0 +1,30 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: OpenShift (OKD / Red Hat OpenShift)
+# ==============================================================================
+# Unified role supporting both free open-source OKD (default) and commercial
+# Red Hat OpenShift Container Platform (OCP) via 'openshift_edition'.
+
+# Air-gapped (Offline) deployment toggle
+airgapped_mode: false
+
+# Edition selector: "okd" (Free Open-Source, Default) or "ocp" (Red Hat Commercial)
+openshift_edition: "okd"
+
+# Release versions
+openshift_okd_version: "4.15.0-0.okd-2024-03-10-010116"
+openshift_ocp_version: "4.15.12"
+
+# Cluster naming & DNS domain
+openshift_cluster_name: "openiac-ocp"
+openshift_base_domain: "openiac.local"
+
+# Networking CIDRs
+openshift_cluster_network_cidr: "10.128.0.0/14"
+openshift_service_network_cidr: "172.30.0.0/16"
+
+# Default dummy pull secret for OKD (Replace with Red Hat pull secret when using "ocp")
+openshift_pull_secret: '{"auths":{"fake":{"auth":"aWQ6cGFzcwo="}}}'
+
+# Built-in offline local mirror registry port
+openshift_local_registry_port: 5000

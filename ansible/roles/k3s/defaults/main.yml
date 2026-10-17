@@ -1,0 +1,17 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: K3s (Lightweight Kubernetes)
+# ==============================================================================
+# Sensible defaults for zero-config deployment. Override in group_vars/all.yml.
+
+# Air-gapped (Offline) deployment toggle
+airgapped_mode: false
+
+# Default K3s release version
+k3s_version: "v1.28.4+k3s2"
+
+# K3s server execution arguments
+k3s_server_exec_args: "server --node-ip {{ ansible_host }} --tls-san {{ ansible_host }} --write-kubeconfig-mode 644"
+
+# K3s agent (worker) execution arguments
+k3s_agent_exec_args: "agent --node-ip {{ ansible_host }}"

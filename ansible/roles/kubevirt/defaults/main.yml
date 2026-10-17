@@ -1,0 +1,16 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: KubeVirt (Cloud-Native VM Virtualization)
+# ==============================================================================
+# Deploys KubeVirt and Containerized Data Importer (CDI) onto an existing
+# Kubernetes (k8s/k3s/openshift) cluster to unify VMs and containers.
+
+# Air-gapped (Offline) deployment toggle
+airgapped_mode: false
+
+# KubeVirt & CDI release versions
+kubevirt_version: "v1.2.0"
+kubevirt_cdi_version: "v1.59.0"
+
+# Automatically enable QEMU software emulation if /dev/kvm is unavailable (e.g., nested VMs)
+kubevirt_auto_emulation_fallback: true

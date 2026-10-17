@@ -1,0 +1,10 @@
+---
+# ==============================================================================
+# OpenIaC Playbook: Standard Upstream Kubernetes (K8s)
+# ==============================================================================
+- name: OpenIaC - Upstream Kubernetes (Kubeadm) Cluster Deployment
+  hosts: all
+  become: true
+  roles:
+    - role: base_os
+    - role: k8s

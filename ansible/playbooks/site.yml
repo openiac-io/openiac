@@ -1,20 +1,55 @@
 ---
-- name: OpenIaC - Base OS Configuration
+# ==============================================================================
+# OpenIaC Playbook: Unified Site Entrypoint
+# ==============================================================================
+# Master playbook for orchestrating multiple platform tiers via tags.
+# Usage: ansible-playbook -i inventories/<sample>/hosts.ini playbooks/site.yml --tags <platform>
+
+- name: OpenIaC - Base OS Preparation
   hosts: all
-  become: yes
-  roles:
+  become: true
+  tags:
+    - always
     - base_os
-
-- name: OpenIaC - Kubernetes Deployment
-  hosts: k8s_cluster
-  become: yes
-  tags: ['k8s']
   roles:
-    - k3s
+    - role: base_os
 
-- name: OpenIaC - OpenStack Deployment
-  hosts: openstack_compute
-  become: yes
-  tags: ['openstack']
-  # roles:
-  #   - openstack_compute
+- name: OpenIaC - Lightweight Kubernetes (K3s) Deployment
+  hosts: k8s_cluster
+  become: true
+  tags:
+    - k3s
+  roles:
+    - role: k3s
+
+- name: OpenIaC - Standard Upstream Kubernetes (K8s) Deployment
+  hosts: k8s_cluster
+  become: true
+  tags:
+    - k8s
+  roles:
+    - role: k8s
+
+- name: OpenIaC - OpenShift / OKD Deployment
+  hosts: all
+  become: true
+  tags:
+    - openshift
+  roles:
+    - role: openshift
+
+- name: OpenIaC - KubeVirt Cloud-Native Virtualization Deployment
+  hosts: k8s_cluster
+  become: true
+  tags:
+    - kubevirt
+  roles:
+    - role: kubevirt
+
+- name: OpenIaC - OpenStack Private Cloud Deployment
+  hosts: all
+  become: true
+  tags:
+    - openstack
+  roles:
+    - role: openstack

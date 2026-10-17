@@ -1,0 +1,10 @@
+---
+# ==============================================================================
+# OpenIaC Playbook: Lightweight Kubernetes (K3s)
+# ==============================================================================
+- name: OpenIaC - K3s Cluster Deployment
+  hosts: all
+  become: true
+  roles:
+    - role: base_os
+    - role: k3s

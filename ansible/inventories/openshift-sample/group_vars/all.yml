@@ -1,0 +1,21 @@
+---
+# ==============================================================================
+# OpenIaC Global Configuration (OpenShift / OKD)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Deployment Mode
+# ------------------------------------------------------------------------------
+airgapped_mode: false
+
+# ------------------------------------------------------------------------------
+# 2. OpenShift / OKD Configuration
+# ------------------------------------------------------------------------------
+# Choose "okd" (Free Open-Source, Default) or "ocp" (Red Hat Commercial)
+openshift_edition: "okd"
+
+openshift_okd_version: "4.15.0-0.okd-2024-03-10-010116"
+openshift_ocp_version: "4.15.12"
+
+openshift_cluster_name: "openiac-ocp"
+openshift_base_domain: "openiac.local"

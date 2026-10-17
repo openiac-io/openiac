@@ -1,0 +1,10 @@
+---
+# ==============================================================================
+# OpenIaC Playbook: OpenShift / OKD Container Platform
+# ==============================================================================
+- name: OpenIaC - OpenShift / OKD Cluster Deployment
+  hosts: all
+  become: true
+  roles:
+    - role: base_os
+    - role: openshift

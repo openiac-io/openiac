@@ -1,26 +1,95 @@
-# OpenIaC Core Monorepo
+# OpenIaC — Hybrid Cloud & Container Platform Framework
 
-Welcome to the **OpenIaC Core Monorepo**. This repository contains the community-driven, 100% open-source Infrastructure as Code (IaC) toolset for deploying enterprise-grade baremetal and air-gapped environments.
+**OpenIaC** is an enterprise-grade, 100% open-source Infrastructure as Code (IaC) framework designed to provision **Container, Cloud-Native Virtualization, and Private/Public Cloud Platforms** with a single command.
 
-## 🚀 Architecture Overview
-
-This monorepo serves as a "Swiss Army Knife" for infrastructure provisioning. By adjusting simple feature flags, you can deploy everything from base OS configurations to Kubernetes (RKE2/K3s), OpenStack, and private registries.
-
-### Directory Structure
-
-- **`ansible/`**: The heart of the provisioning logic.
-  - `inventories/`: Define your target nodes (baremetal, VMs).
-  - `playbooks/`: Entry points for deployment (e.g., `site.yml`).
-  - `roles/`: Highly modular Ansible roles (e.g., `base_os`, `k8s`, `openstack`).
-- **`packager/`**: Scripts to collect and bundle offline artifacts (Docker images, RPMs/DEBs, binaries) into a single tarball for air-gapped deployment.
-
-## 🛡️ Monetization & Enterprise Support
-
-While all code in this repository is completely **Open Source and Free to use**, compiling the offline artifacts (`offline-images.tar.gz`) requires significant time, internet bandwidth, and stable build environments. 
-
-For enterprise environments that need guaranteed stability and zero hassle, we offer the **OpenIaC Enterprise Subscription**, which provides:
-1. **Pre-built & Verified Artifacts**: Instantly download the 50GB+ offline tarballs.
-2. **Technical Support SLA**: Expert troubleshooting for your air-gapped baremetal setups.
+Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, load balancers, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
 
 ---
-*Built for infrastructure engineers, by infrastructure engineers.*
+
+## 🎯 Supported Tier-1 Platforms
+
+| Domain | Platform | Engine / Tech Stack | Air-gapped Ready | Entrypoint Command |
+| :--- | :--- | :--- | :---: | :--- |
+| **On-Premise Container** | **`k8s`** | Upstream Kubernetes (`kubeadm` + `containerd` + `Calico`) | ✅ | `make k8s` |
+| **On-Premise Container** | **`k3s`** | Lightweight Kubernetes (SUSE Rancher K3s) | ✅ | `make k3s` |
+| **On-Premise Container** | **`openshift`** | Unified **OKD** (Free Default) & **Red Hat OpenShift (OCP)** | ✅ | `make openshift` |
+| **On-Premise Virtualization** | **`kubevirt`** | Cloud-Native VM Virtualization on K8s / OpenShift | ✅ | `make kubevirt` |
+| **On-Premise Private Cloud** | **`openstack`** | Private Cloud IaaS (`Kolla-Ansible` Containerized) | ✅ | `make openstack` |
+| **Public Cloud (AWS)** | **`aws`** | Amazon EKS All-in-One Production Platform | — | `make aws-apply` |
+| **Public Cloud (GCP)** | **`gcp`** | Google Kubernetes Engine (GKE) Production Platform | — | `make gcp-apply` |
+| **Public Cloud (Azure)** | **`azure`** | Azure Kubernetes Service (AKS) Production Platform | — | `make azure-apply` |
+
+---
+
+## 📂 Repository Structure
+
+```text
+openiac/
+├── Makefile                 # One-command CLI entrypoint for all platforms
+├── ansible/                 # On-Premise & Private Cloud Automation (RHEL / Rocky Linux)
+│   ├── inventories/         # Pre-configured sample topologies (k3s, k8s, openshift, openstack)
+│   ├── playbooks/           # Standalone and unified playbooks
+│   └── roles/               # Modular roles (base_os, k3s, k8s, openshift, kubevirt, openstack)
+├── terraform/               # Public Cloud Production Blueprints (HCL)
+│   ├── aws/                 # Multi-AZ VPC + Amazon EKS + Managed Node Group
+│   ├── gcp/                 # Dedicated VPC + Google GKE + Managed Node Pool
+│   └── azure/               # VNet + Azure AKS + Managed Identity
+├── packager/                # Modular Air-gapped Artifact Bundler (RPMs, Wheels, Images)
+└── vagrant/                 # Local multi-node testbeds on VirtualBox (Rocky Linux)
+```
+
+---
+
+## 🚀 Quick Start (Copy-Paste Ready)
+
+### 1. On-Premise Deployment (Online or Air-gapped)
+Edit the target IP addresses in `ansible/inventories/<platform>-sample/hosts.ini` and run a single command:
+
+```bash
+# Deploy Lightweight Kubernetes (K3s)
+make k3s
+
+# Deploy Standard Upstream Kubernetes (Kubeadm)
+make k8s
+
+# Deploy KubeVirt VM Virtualization on top of Kubernetes
+make kubevirt
+
+# Deploy OpenShift / OKD (Defaults to free OKD; set openshift_edition: "ocp" for Red Hat OCP)
+make openshift
+
+# Deploy OpenStack Private Cloud (Kolla-Ansible)
+make openstack
+```
+
+### 2. Air-gapped (Offline) Artifact Packaging
+On an internet-connected RHEL / Rocky Linux host, bundle all required binaries, RPMs, and container images into a portable tarball:
+
+```bash
+make pack-k3s
+make pack-k8s
+make pack-openshift
+make pack-kubevirt
+make pack-openstack
+```
+
+### 3. Public Cloud Provisioning (Terraform)
+All public cloud modules come with sensible defaults. Authenticate with your cloud CLI and run:
+
+```bash
+# Provision Amazon EKS on AWS
+make aws-apply
+
+# Provision Google GKE on GCP
+make gcp-apply
+
+# Provision Azure AKS on Azure
+make azure-apply
+```
+
+---
+
+## 🛡️ Architecture Principles
+* **Enterprise Linux Standardization**: Optimized for **RHEL / Rocky Linux** with dynamic version compatibility.
+* **Built-in Invisible Helpers**: Load balancers (HAProxy), Cinder LVM volumes, and air-gapped registries are transparently embedded within platform roles—no manual prerequisite setup required.
+* **Zero External Ansible Dependencies**: Built strictly with `ansible.builtin` modules so playbooks run out-of-the-box on minimal `ansible-core` installations.
