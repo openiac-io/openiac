@@ -1,0 +1,27 @@
+# ==============================================================================
+# OpenIaC Template: OpenShift / OKD install-config.yaml
+# ==============================================================================
+apiVersion: v1
+baseDomain: {{ openshift_base_domain }}
+metadata:
+  name: {{ openshift_cluster_name }}
+compute:
+  - hyperthreading: Enabled
+    name: worker
+    replicas: {{ groups['openshift_workers'] | default([]) | length }}
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  replicas: {{ groups['openshift_control_plane'] | default(['cp-01']) | length }}
+networking:
+  clusterNetwork:
+    - cidr: {{ openshift_cluster_network_cidr }}
+      hostPrefix: 23
+  networkType: OVNKubernetes
+  serviceNetwork:
+    - {{ openshift_service_network_cidr }}
+platform:
+  none: {}
+fips: false
+pullSecret: '{{ openshift_pull_secret }}'
+sshKey: '{{ openshift_ssh_pub_key_raw.stdout | trim }}'

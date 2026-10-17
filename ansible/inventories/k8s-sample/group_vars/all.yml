@@ -1,0 +1,25 @@
+---
+# ==============================================================================
+# OpenIaC Global Configuration (Standard Kubernetes & KubeVirt)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Deployment Mode
+# ------------------------------------------------------------------------------
+# Set to 'true' for air-gapped environments (requires artifacts in packager/artifacts/k8s)
+airgapped_mode: false
+
+# ------------------------------------------------------------------------------
+# 2. Upstream Kubernetes (Kubeadm) Configuration
+# ------------------------------------------------------------------------------
+k8s_version: "1.29.3"
+k8s_minor_version: "v1.29"
+k8s_pod_network_cidr: "192.168.0.0/16"
+k8s_calico_version: "v3.27.2"
+
+# ------------------------------------------------------------------------------
+# 3. Cloud-Native Virtualization (KubeVirt) Configuration
+# ------------------------------------------------------------------------------
+kubevirt_version: "v1.2.0"
+kubevirt_cdi_version: "v1.59.0"
+kubevirt_auto_emulation_fallback: true

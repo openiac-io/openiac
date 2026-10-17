@@ -1,0 +1,18 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: Kubernetes (Standard Kubeadm)
+# ==============================================================================
+# Sensible defaults for zero-config deployment. Override in group_vars/all.yml.
+
+# Air-gapped (Offline) deployment toggle
+airgapped_mode: false
+
+# Upstream Kubernetes version (Minor stream & patch release)
+k8s_version: "1.29.3"
+k8s_minor_version: "v1.29"
+
+# Pod network CIDR (Default matches Calico standard CIDR)
+k8s_pod_network_cidr: "192.168.0.0/16"
+
+# Calico CNI manifest version
+k8s_calico_version: "v3.27.2"

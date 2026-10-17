@@ -1,0 +1,64 @@
+# ==============================================================================
+# OpenIaC Built-in Helper: HAProxy Configuration for OpenShift / OKD
+# ==============================================================================
+global
+    log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+
+defaults
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    option                  dontlognull
+    retries                 3
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout check           10s
+    maxconn                 3000
+
+frontend openshift-api-server
+    bind *:6443
+    default_backend openshift-api-server
+
+backend openshift-api-server
+    balance roundrobin
+{% for host in groups['openshift_control_plane'] | default([]) %}
+    server {{ host }} {{ hostvars[host].ansible_host }}:6443 check
+{% endfor %}
+
+frontend machine-config-server
+    bind *:22623
+    default_backend machine-config-server
+
+backend machine-config-server
+    balance roundrobin
+{% for host in groups['openshift_control_plane'] | default([]) %}
+    server {{ host }} {{ hostvars[host].ansible_host }}:22623 check
+{% endfor %}
+
+frontend ingress-http
+    bind *:80
+    default_backend ingress-http
+
+backend ingress-http
+    balance roundrobin
+{% for host in groups['openshift_workers'] | default(groups['openshift_control_plane'] | default([])) %}
+    server {{ host }} {{ hostvars[host].ansible_host }}:80 check
+{% endfor %}
+
+frontend ingress-https
+    bind *:443
+    default_backend ingress-https
+
+backend ingress-https
+    balance roundrobin
+{% for host in groups['openshift_workers'] | default(groups['openshift_control_plane'] | default([])) %}
+    server {{ host }} {{ hostvars[host].ansible_host }}:443 check
+{% endfor %}

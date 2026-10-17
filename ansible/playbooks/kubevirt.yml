@@ -1,0 +1,9 @@
+---
+# ==============================================================================
+# OpenIaC Playbook: KubeVirt Cloud-Native Virtualization
+# ==============================================================================
+- name: OpenIaC - KubeVirt Virtualization Deployment
+  hosts: all
+  become: true
+  roles:
+    - role: kubevirt

@@ -1,11 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # OpenIaC Modular Offline Packager
 # ==============================================================================
-# This script is designed with a modular architecture for true Air-gapped deployments.
-# Use the --target option to generate offline packages for specific solutions (e.g., k3s, openstack).
+# Collects and bundles offline artifacts (binaries, container images, RPMs, wheels)
+# for true air-gapped enterprise deployments on RHEL / Rocky Linux.
+# Usage: ./build_offline_tarball.sh --target <platform> [--version <version>]
 
-set -e
+set -euo pipefail
 
 # Default configurations
 TARGET=""
@@ -14,70 +15,74 @@ ARTIFACT_DIR="artifacts"
 
 # Argument parsing
 while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --target) TARGET="$2"; shift ;;
-        --version) VERSION="$2"; shift ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
-    esac
-    shift
+  case "$1" in
+    --target)
+      TARGET="$2"
+      shift
+      ;;
+    --version)
+      VERSION="$2"
+      shift
+      ;;
+    *)
+      echo "[ERROR] Unknown parameter passed: $1"
+      exit 1
+      ;;
+  esac
+  shift
 done
 
 # Validate target
-if [ -z "$TARGET" ]; then
-    echo "================================================================"
-    echo "❌ Error: Target is required!"
-    echo "Usage: $0 --target <solution_name> [--version <version>]"
-    echo "Example: $0 --target k3s --version v1.28.4+k3s2"
-    echo "================================================================"
-    exit 1
+if [[ -z "${TARGET}" ]]; then
+  echo "=============================================================================="
+  echo "[ERROR] Target platform is required!"
+  echo "Usage:   $0 --target <k3s|k8s|openshift|kubevirt|openstack> [--version <ver>]"
+  echo "Example: $0 --target k3s --version v1.28.4+k3s2"
+  echo "=============================================================================="
+  exit 1
 fi
 
 SCRIPT_PATH="scripts/${TARGET}.sh"
 
-if [ ! -f "$SCRIPT_PATH" ]; then
-    echo "??Error: Packager module for '$TARGET' not found at $SCRIPT_PATH"
-    exit 1
+if [[ ! -f "${SCRIPT_PATH}" ]]; then
+  echo "[ERROR] Packager module for '${TARGET}' not found at ${SCRIPT_PATH}"
+  exit 1
 fi
 
 # ==============================================================================
-# [Pre-flight] OS Check
+# [Pre-flight] Enterprise Linux OS Verification
 # ==============================================================================
-# Check if running on a compatible RHEL-based OS (Rocky/Alma/RHEL)
-if [ ! -f "/etc/os-release" ]; then
-    echo "?? ERROR: /etc/os-release not found. This script must be run on a Linux OS."
-    exit 1
+if [[ ! -f "/etc/os-release" ]]; then
+  echo "[ERROR] /etc/os-release not found. This script must be run on a Linux host."
+  exit 1
 fi
 
+# shellcheck disable=SC1091
 source /etc/os-release
-if [[ "$ID_LIKE" != *"rhel"* ]] && [[ "$ID_LIKE" != *"centos"* ]] && [[ "$ID_LIKE" != *"fedora"* ]]; then
-    echo "?? ERROR: Incompatible OS detected ($ID)."
-    echo "This Packager downloads RPMs for Enterprise Air-gapped environments."
-    echo "Please run this script on a RHEL/Rocky Linux machine matching your target baremetal OS."
-    exit 1
+if [[ "${ID_LIKE:-}" != *"rhel"* ]] && [[ "${ID_LIKE:-}" != *"centos"* ]] && [[ "${ID_LIKE:-}" != *"fedora"* ]]; then
+  echo "[ERROR] Incompatible OS detected (${ID:-unknown})."
+  echo "OpenIaC Packager collects RPMs for Enterprise Linux (RHEL / Rocky Linux)."
+  exit 1
 fi
 
-OS_MAJOR_VERSION=$(echo $VERSION_ID | cut -d'.' -f1)
-echo "? Detected Host OS: $NAME $VERSION_ID (Major: $OS_MAJOR_VERSION)"
-echo "?? IMPORTANT: The artifacts generated here must be deployed to Target Servers running RHEL/Rocky ${OS_MAJOR_VERSION}.x!"
+OS_MAJOR_VERSION=$(echo "${VERSION_ID}" | cut -d'.' -f1)
+echo "=============================================================================="
+echo "[INFO] Detected Host OS : ${NAME} ${VERSION_ID} (EL${OS_MAJOR_VERSION})"
+echo "[INFO] Target Platform  : ${TARGET}"
 echo "=============================================================================="
 
-echo "🚀 Starting OpenIaC Offline Artifact Collection for: [ $TARGET ]"
+# 1. Execute the platform-specific module script
+bash "${SCRIPT_PATH}" "${VERSION}" "${ARTIFACT_DIR}"
 
-# 1. Execute the solution-specific module script (Delegates download logic)
-bash "$SCRIPT_PATH" "$VERSION" "$ARTIFACT_DIR"
-
-# 2. Compress the downloaded artifacts
+# 2. Compress the collected artifacts into a portable tarball
 TARBALL_NAME="openiac-${TARGET}-offline-el${OS_MAJOR_VERSION}.tar.gz"
-if [ -n "$VERSION" ]; then
-    TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}-el${OS_MAJOR_VERSION}.tar.gz"
+if [[ -n "${VERSION}" ]]; then
+  TARBALL_NAME="openiac-${TARGET}-offline-${VERSION//+/-}-el${OS_MAJOR_VERSION}.tar.gz"
 fi
 
-echo "📦 Compressing artifacts into $TARBALL_NAME..."
-# Archive ONLY the specific target directory (e.g., artifacts/k3s)
-tar -czf "$TARBALL_NAME" "$ARTIFACT_DIR/$TARGET"
+echo "===> Compressing offline bundle into ${TARBALL_NAME}..."
+tar -czf "${TARBALL_NAME}" "${ARTIFACT_DIR}/${TARGET}"
 
-echo "================================================================"
-echo "✅ Artifact creation complete!"
-echo "📁 Output: $(pwd)/$TARBALL_NAME"
-echo "💡 To use offline, extract this tarball in the OpenIaC packager directory."
-echo "================================================================"
+echo "=============================================================================="
+echo "[SUCCESS] Offline artifact bundle created: $(pwd)/${TARBALL_NAME}"
+echo "=============================================================================="

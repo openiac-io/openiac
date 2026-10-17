@@ -1,44 +1,93 @@
 ---
 # ==============================================================================
-# OpenIaC Base OS Configuration (RHEL/Rocky 9)
+# OpenIaC Ansible Role: Base OS Configuration (RHEL / Rocky Linux)
 # ==============================================================================
+# Prepares Enterprise Linux hosts with required kernel modules, sysctl tuning,
+# and security baseline adjustments for container and cloud platforms.
+# Uses strictly built-in Ansible modules for zero external collection dependencies.
 
-- name: Disable SWAP (Required for Kubernetes)
-  command: swapoff -a
+# ------------------------------------------------------------------------------
+# 1. Pre-flight OS Validation
+# ------------------------------------------------------------------------------
+- name: Verify target host is running an Enterprise Linux distribution (RHEL/Rocky)
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "RedHat"
+    fail_msg: >-
+      Unsupported OS detected ({{ ansible_distribution }}).
+      OpenIaC strictly standardizes on RHEL / Rocky Linux distributions.
+    success_msg: >-
+      Verified compatible Enterprise Linux OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+# ------------------------------------------------------------------------------
+# 2. Memory & Swap Configuration
+# ------------------------------------------------------------------------------
+- name: Disable active swap memory (Required for Kubernetes kubelet stability)
+  ansible.builtin.command: swapoff -a
   when: ansible_swaptotal_mb > 0
+  changed_when: true
 
-- name: Remove swapfile from /etc/fstab
-  replace:
+- name: Disable swap persistence in /etc/fstab
+  ansible.builtin.replace:
     path: /etc/fstab
-    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    regexp: '^([^#].*?\sswap\s+.*)$'
     replace: '# \1'
 
-- name: Set SELinux to permissive
-  selinux:
-    policy: targeted
-    state: permissive
+# ------------------------------------------------------------------------------
+# 3. Security & Firewall Baseline
+# ------------------------------------------------------------------------------
+- name: Set SELinux to permissive mode at runtime
+  ansible.builtin.command: setenforce 0
+  when:
+    - ansible_selinux is defined
+    - ansible_selinux.status == "enabled"
+    - ansible_selinux.mode == "enforcing"
+  changed_when: true
+  failed_when: false
 
-- name: Ensure firewalld is stopped and disabled
-  systemd:
+- name: Persist SELinux permissive mode in /etc/selinux/config
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: 'SELINUX=permissive'
+  failed_when: false
+
+- name: Ensure firewalld service is stopped and disabled
+  ansible.builtin.systemd:
     name: firewalld
     state: stopped
     enabled: false
+  failed_when: false
+
+# ------------------------------------------------------------------------------
+# 4. Kernel Modules & Network Sysctl Tuning
+# ------------------------------------------------------------------------------
+- name: Persist required kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/openiac-cri.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
 
 - name: Load required kernel modules (overlay, br_netfilter)
-  modprobe:
-    name: "{{ item }}"
-    state: present
+  ansible.builtin.command: "modprobe {{ item }}"
   loop:
     - overlay
     - br_netfilter
+  changed_when: false
 
-- name: Configure sysctl for Kubernetes
-  sysctl:
-    name: "{{ item.name }}"
-    value: "{{ item.value }}"
-    state: present
-    reload: yes
-  loop:
-    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
-    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
-    - { name: 'net.ipv4.ip_forward', value: '1' }
+- name: Configure kernel sysctl parameters for container networking
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-openiac-cri.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+    mode: "0644"
+  register: base_os_sysctl_config
+
+- name: Reload kernel sysctl parameters
+  ansible.builtin.command: sysctl --system
+  when: base_os_sysctl_config.changed
+  changed_when: true
