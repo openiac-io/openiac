@@ -7,6 +7,9 @@
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Pluggable installation engine: "kubeadm" (CNCF upstream standard)
+k8s_install_method: "kubeadm"
+
 # Upstream Kubernetes version (Minor stream & patch release)
 k8s_version: "1.29.3"
 k8s_minor_version: "v1.29"

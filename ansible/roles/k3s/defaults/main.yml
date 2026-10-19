@@ -7,6 +7,9 @@
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Pluggable installation engine: "binary" (SUSE Rancher single-binary standard)
+k3s_install_method: "binary"
+
 # Default K3s release version
 k3s_version: "v1.28.4+k3s2"
 

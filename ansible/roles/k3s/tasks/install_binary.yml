@@ -1,0 +1,200 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role: K3s (Lightweight Kubernetes)
+# ==============================================================================
+# Deploys a production-ready K3s cluster supporting both Air-gapped (Offline)
+# and Online modes with automatic kubeconfig setup for zero-knowledge UX.
+
+- name: Deploy K3s Cluster (Air-gapped or Online)
+  block:
+    # --------------------------------------------------------------------------
+    # 1. Air-gapped (Offline) Artifact Distribution & Control Plane Install
+    # --------------------------------------------------------------------------
+    - name: "[Offline] Ensure K3s air-gap images directory exists"
+      ansible.builtin.file:
+        path: /var/lib/rancher/k3s/agent/images/
+        state: directory
+        mode: "0755"
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Install local RPM dependencies if present"
+      ansible.builtin.shell: "dnf install -y --disablerepo='*' /openiac/packager/artifacts/k3s/rpms/*.rpm"
+      when: airgapped_mode | default(false) | bool
+      failed_when: false
+      changed_when: true
+
+    - name: "[Offline] Copy K3s air-gap images tarball to nodes"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/k3s/k3s-airgap-images-{{ k3s_version }}-amd64.tar"
+        dest: /var/lib/rancher/k3s/agent/images/k3s-airgap-images-amd64.tar
+        mode: "0644"
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Copy K3s binary to nodes"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/k3s/k3s-{{ k3s_version }}"
+        dest: /usr/local/bin/k3s
+        mode: "0755"
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Copy K3s install script to nodes"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/k3s/install.sh"
+        dest: /tmp/k3s-install.sh
+        mode: "0755"
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Install K3s Control Plane (Server)"
+      ansible.builtin.command: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_DOWNLOAD: "true"
+        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }}"
+      when:
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['k8s_control_plane']
+      register: k3s_offline_server_result
+      changed_when: "'No change' not in k3s_offline_server_result.stdout"
+
+    # --------------------------------------------------------------------------
+    # 2. Online Control Plane Install
+    # --------------------------------------------------------------------------
+    - name: "[Online] Download K3s official install script"
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install-online.sh
+        mode: "0755"
+      when: not (airgapped_mode | default(false) | bool)
+
+    - name: "[Online] Install K3s Control Plane (Server)"
+      ansible.builtin.command: /tmp/k3s-install-online.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }}"
+      when:
+        - not (airgapped_mode | default(false) | bool)
+        - inventory_hostname in groups['k8s_control_plane']
+      register: k3s_online_server_result
+      changed_when: "'No change' not in k3s_online_server_result.stdout"
+
+    # --------------------------------------------------------------------------
+    # 3. Control Plane Readiness Verification
+    # --------------------------------------------------------------------------
+    - name: Wait for K3s Control Plane node to report Ready
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes
+      register: k3s_kubectl_nodes
+      until: "' Ready ' in k3s_kubectl_nodes.stdout"
+      retries: 20
+      delay: 15
+      changed_when: false
+      when: inventory_hostname in groups['k8s_control_plane']
+
+    # --------------------------------------------------------------------------
+    # 4. Worker Node Join Logic
+    # --------------------------------------------------------------------------
+    - name: Wait for K3s node-token file to be generated on Control Plane
+      ansible.builtin.wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      run_once: true
+
+    - name: Read K3s cluster join token from Control Plane
+      ansible.builtin.command: cat /var/lib/rancher/k3s/server/node-token
+      register: k3s_token_raw
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      run_once: true
+      changed_when: false
+
+    - name: Set k3s_join_token fact for worker nodes
+      ansible.builtin.set_fact:
+        k3s_join_token: "{{ k3s_token_raw.stdout | trim }}"
+      run_once: true
+
+    - name: "[Offline] Join K3s Worker Nodes (Agent)"
+      ansible.builtin.command: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_SKIP_DOWNLOAD: "true"
+        K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
+        K3S_TOKEN: "{{ k3s_join_token }}"
+        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }}"
+      when:
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname in groups['k8s_workers']
+      register: k3s_offline_worker_result
+      changed_when: "'No change' not in k3s_offline_worker_result.stdout"
+
+    - name: "[Online] Join K3s Worker Nodes (Agent)"
+      ansible.builtin.command: /tmp/k3s-install-online.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
+        K3S_TOKEN: "{{ k3s_join_token }}"
+        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }}"
+      when:
+        - not (airgapped_mode | default(false) | bool)
+        - inventory_hostname in groups['k8s_workers']
+      register: k3s_online_worker_result
+      changed_when: "'No change' not in k3s_online_worker_result.stdout"
+
+  always:
+    - name: Clean up temporary K3s installation scripts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/k3s-install.sh
+        - /tmp/k3s-install-online.sh
+      failed_when: false
+
+# ------------------------------------------------------------------------------
+# 5. Post-Install User Experience (Automatic Kubeconfig Setup)
+# ------------------------------------------------------------------------------
+- name: Ensure .kube directory exists for root user
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: "0755"
+  when: inventory_hostname in groups['k8s_control_plane']
+
+- name: Copy kubeconfig to root user directory
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /root/.kube/config
+    remote_src: true
+    mode: "0600"
+  when: inventory_hostname in groups['k8s_control_plane']
+
+- name: Ensure .kube directory exists for ansible_user
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when:
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user is defined
+    - ansible_user != "root"
+
+- name: Copy kubeconfig to ansible_user directory
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when:
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user is defined
+    - ansible_user != "root"
+
+- name: Export KUBECONFIG automatically in ansible_user .bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: "export KUBECONFIG=~/.kube/config"
+    create: true
+    mode: "0644"
+  when:
+    - inventory_hostname in groups['k8s_control_plane']
+    - ansible_user is defined
+    - ansible_user != "root"
