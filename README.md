@@ -2,7 +2,7 @@
 
 **OpenIaC** is an enterprise-grade, 100% open-source Infrastructure as Code (IaC) framework designed to provision **Container, Cloud-Native Virtualization, and Private/Public Cloud Platforms** with a single command.
 
-Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, load balancers, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
+Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, agent-based ISO generation, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
 
 ---
 
