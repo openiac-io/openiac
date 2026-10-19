@@ -1,15 +1,16 @@
 ---
 # ==============================================================================
-# OpenIaC Global Configuration (OpenShift / OKD)
+# OpenIaC Global Configuration (OpenShift / OKD — Agent-Based Standard)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. Deployment Mode
+# 1. Deployment Mode & Engine
 # ------------------------------------------------------------------------------
 airgapped_mode: false
+openshift_install_method: "agent"
 
 # ------------------------------------------------------------------------------
-# 2. OpenShift / OKD Configuration
+# 2. OpenShift / OKD Edition & Version (Requires 4.12+)
 # ------------------------------------------------------------------------------
 # Choose "okd" (Free Open-Source, Default) or "ocp" (Red Hat Commercial)
 openshift_edition: "okd"
@@ -17,5 +18,10 @@ openshift_edition: "okd"
 openshift_okd_version: "4.15.0-0.okd-2024-03-10-010116"
 openshift_ocp_version: "4.15.12"
 
+# ------------------------------------------------------------------------------
+# 3. Cluster Identity & Built-in VIPs
+# ------------------------------------------------------------------------------
 openshift_cluster_name: "openiac-ocp"
 openshift_base_domain: "openiac.local"
+openshift_api_vip: "192.168.56.100"
+openshift_ingress_vip: "192.168.56.101"

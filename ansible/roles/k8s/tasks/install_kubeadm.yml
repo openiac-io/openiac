@@ -1,0 +1,197 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role: Kubernetes (Standard Kubeadm HA Cluster)
+# ==============================================================================
+# Deploys an upstream CNCF Kubernetes cluster using containerd, kubeadm, and
+# Calico CNI on RHEL / Rocky Linux in both Air-gapped and Online environments.
+
+- name: Deploy Upstream Kubernetes Cluster (Air-gapped or Online)
+  block:
+    # --------------------------------------------------------------------------
+    # 1. Container Runtime (containerd) & Kubernetes Package Installation
+    # --------------------------------------------------------------------------
+    - name: "[Offline] Copy offline Kubernetes RPMs and images to nodes"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/k8s/"
+        dest: /tmp/openiac-k8s-artifacts/
+        mode: "0755"
+      when: airgapped_mode | default(false) | bool
+
+    - name: "[Offline] Install containerd and Kubernetes RPMs from local cache"
+      ansible.builtin.shell: "dnf install -y --disablerepo='*' /tmp/openiac-k8s-artifacts/rpms/*.rpm"
+      when: airgapped_mode | default(false) | bool
+      changed_when: true
+
+    - name: "[Online] Configure official Docker CE repository for containerd.io"
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+        mode: "0644"
+      when: not (airgapped_mode | default(false) | bool)
+
+    - name: "[Online] Configure official Kubernetes pkgs.k8s.io repository"
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/kubernetes.repo
+        content: |
+          [kubernetes]
+          name=Kubernetes
+          baseurl=https://pkgs.k8s.io/core:/stable:/{{ k8s_minor_version }}/rpm/
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://pkgs.k8s.io/core:/stable:/{{ k8s_minor_version }}/rpm/repodata/repomd.xml.key
+        mode: "0644"
+      when: not (airgapped_mode | default(false) | bool)
+
+    - name: "[Online] Install containerd.io, kubelet, kubeadm, and kubectl"
+      ansible.builtin.dnf:
+        name:
+          - containerd.io
+          - "kubelet-{{ k8s_version }}"
+          - "kubeadm-{{ k8s_version }}"
+          - "kubectl-{{ k8s_version }}"
+          - iproute-tc
+        state: present
+      when: not (airgapped_mode | default(false) | bool)
+
+    # --------------------------------------------------------------------------
+    # 2. Containerd SystemdCgroup Configuration
+    # --------------------------------------------------------------------------
+    - name: Ensure /etc/containerd directory exists
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        mode: "0755"
+
+    - name: Generate default containerd configuration with SystemdCgroup enabled
+      ansible.builtin.shell: |
+        containerd config default > /etc/containerd/config.toml
+        sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+
+    - name: Enable and start containerd and kubelet services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      loop:
+        - containerd
+        - kubelet
+
+    - name: "[Offline] Pre-load Kubernetes & Calico container images into containerd"
+      ansible.builtin.command: ctr -n k8s.io images import /tmp/openiac-k8s-artifacts/images/k8s-images.tar
+      when: airgapped_mode | default(false) | bool
+      changed_when: true
+
+    # --------------------------------------------------------------------------
+    # 3. Control Plane Initialization (kubeadm init)
+    # --------------------------------------------------------------------------
+    - name: Check if Kubernetes Control Plane is already initialized
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_admin_conf
+      when: inventory_hostname in groups['k8s_control_plane']
+
+    - name: Initialize Kubernetes Control Plane with kubeadm
+      ansible.builtin.command: >-
+        kubeadm init
+        --apiserver-advertise-address={{ ansible_host }}
+        --pod-network-cidr={{ k8s_pod_network_cidr }}
+        --kubernetes-version=v{{ k8s_version }}
+      when:
+        - inventory_hostname == groups['k8s_control_plane'][0]
+        - not k8s_admin_conf.stat.exists
+      changed_when: true
+
+    # --------------------------------------------------------------------------
+    # 4. Kubeconfig Setup & CNI Network Deployment
+    # --------------------------------------------------------------------------
+    - name: Ensure .kube directory exists for root user
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        mode: "0755"
+      when: inventory_hostname == groups['k8s_control_plane'][0]
+
+    - name: Copy admin.conf to /root/.kube/config
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: true
+        mode: "0600"
+      when: inventory_hostname == groups['k8s_control_plane'][0]
+
+    - name: Ensure .kube directory exists for ansible_user
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+      when:
+        - inventory_hostname == groups['k8s_control_plane'][0]
+        - ansible_user is defined
+        - ansible_user != "root"
+
+    - name: Copy admin.conf to ansible_user directory
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+      when:
+        - inventory_hostname == groups['k8s_control_plane'][0]
+        - ansible_user is defined
+        - ansible_user != "root"
+
+    - name: "[Offline] Apply Calico CNI manifest from local artifact"
+      ansible.builtin.command: kubectl apply -f /tmp/openiac-k8s-artifacts/manifests/calico.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when:
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname == groups['k8s_control_plane'][0]
+      changed_when: true
+
+    - name: "[Online] Apply Calico CNI manifest from upstream release"
+      ansible.builtin.command: >-
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ k8s_calico_version }}/manifests/calico.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when:
+        - not (airgapped_mode | default(false) | bool)
+        - inventory_hostname == groups['k8s_control_plane'][0]
+      changed_when: true
+
+    # --------------------------------------------------------------------------
+    # 5. Worker Node Join Logic
+    # --------------------------------------------------------------------------
+    - name: Generate kubeadm join command from Control Plane
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: k8s_join_command_raw
+      delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+      run_once: true
+      changed_when: false
+
+    - name: Check if worker node has already joined the cluster
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: k8s_kubelet_conf
+      when: inventory_hostname in groups['k8s_workers']
+
+    - name: Join Kubernetes Worker Nodes to the cluster
+      ansible.builtin.command: "{{ k8s_join_command_raw.stdout }}"
+      when:
+        - inventory_hostname in groups['k8s_workers']
+        - not k8s_kubelet_conf.stat.exists
+      changed_when: true
+
+  always:
+    - name: Clean up temporary offline artifact staging directory
+      ansible.builtin.file:
+        path: /tmp/openiac-k8s-artifacts
+        state: absent
+      failed_when: false

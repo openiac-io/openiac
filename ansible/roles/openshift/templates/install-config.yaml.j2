@@ -1,27 +1,42 @@
 # ==============================================================================
-# OpenIaC Template: OpenShift / OKD install-config.yaml
+# OpenIaC Template: OpenShift / OKD install-config.yaml (Agent-Based Standard)
 # ==============================================================================
+{% set total_masters = groups['openshift_control_plane'] | default(['cp-01']) | length %}
+{% set total_workers = groups['openshift_workers'] | default([]) | length %}
 apiVersion: v1
 baseDomain: {{ openshift_base_domain }}
 metadata:
   name: {{ openshift_cluster_name }}
 compute:
-  - hyperthreading: Enabled
+  - architecture: amd64
+    hyperthreading: Enabled
     name: worker
-    replicas: {{ groups['openshift_workers'] | default([]) | length }}
+    replicas: {{ total_workers }}
 controlPlane:
+  architecture: amd64
   hyperthreading: Enabled
   name: master
-  replicas: {{ groups['openshift_control_plane'] | default(['cp-01']) | length }}
+  replicas: {{ total_masters }}
 networking:
   clusterNetwork:
     - cidr: {{ openshift_cluster_network_cidr }}
       hostPrefix: 23
+  machineNetwork:
+    - cidr: "{{ openshift_rendezvous_ip | regex_replace('\\.[0-9]+$', '.0') }}/{{ openshift_prefix_length }}"
   networkType: OVNKubernetes
   serviceNetwork:
     - {{ openshift_service_network_cidr }}
+{% if (total_masters | int) == 1 and (total_workers | int) == 0 %}
 platform:
   none: {}
+{% else %}
+platform:
+  baremetal:
+    apiVIPs:
+      - {{ openshift_api_vip }}
+    ingressVIPs:
+      - {{ openshift_ingress_vip }}
+{% endif %}
 fips: false
 pullSecret: '{{ openshift_pull_secret }}'
 sshKey: '{{ openshift_ssh_pub_key_raw.stdout | trim }}'

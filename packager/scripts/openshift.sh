@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# OpenIaC Packager Module: OpenShift (OKD / Red Hat OCP)
+# OpenIaC Packager Module: OpenShift (OKD / Red Hat OCP 4.12+ Agent-Based)
 # ==============================================================================
-# Downloads openshift-install, oc client binaries, and bastion RPM dependencies
-# for air-gapped OpenShift / OKD deployments.
+# Downloads openshift-install, oc client binaries, and Agent-based Installer
+# host RPM dependencies (nmstate, jq, tar) for air-gapped deployments.
 
 set -euo pipefail
 
@@ -22,12 +22,12 @@ echo "[2/3] Downloading OpenShift (oc) & kubectl client bundle (${VERSION})..."
 curl -sL --retry 3 "https://github.com/okd-project/okd/releases/download/${VERSION}/openshift-client-linux-${VERSION}.tar.gz" \
   -o "${TARGET_DIR}/openshift-client-linux.tar.gz"
 
-echo "[3/3] Downloading bastion RPM dependencies (haproxy, podman, jq)..."
+echo "[3/3] Downloading Agent-based Installer RPM dependencies (nmstate, jq, tar)..."
 if command -v dnf &> /dev/null; then
   dnf download --resolve --alldeps -y -q --destdir="${TARGET_DIR}/rpms" \
-    haproxy podman jq tar
+    nmstate jq tar
 else
   echo "[WARN] 'dnf' command not found. Skipping RPM downloads."
 fi
 
-echo "===> OpenShift / OKD offline artifacts collected successfully in ${TARGET_DIR}"
+echo "===> OpenShift / OKD (Agent-Based) offline artifacts collected successfully in ${TARGET_DIR}"

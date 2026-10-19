@@ -8,6 +8,9 @@
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Pluggable installation engine: "operator" (Official KubeVirt Operator & CDI CRDs)
+kubevirt_install_method: "operator"
+
 # KubeVirt & CDI release versions
 kubevirt_version: "v1.2.0"
 kubevirt_cdi_version: "v1.59.0"

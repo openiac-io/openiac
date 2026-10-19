@@ -1,0 +1,68 @@
+# ==============================================================================
+# OpenIaC Template: OpenShift / OKD agent-config.yaml (Agent-Based Standard)
+# ==============================================================================
+# Automatically maps inventory nodes into static NMState network configurations
+# and designates the primary control-plane node as the self-bootstrapping Rendezvous Host.
+
+apiVersion: v1beta1
+kind: AgentConfig
+metadata:
+  name: {{ openshift_cluster_name }}
+rendezvousIP: {{ openshift_rendezvous_ip }}
+hosts:
+{% for host in (groups['openshift_control_plane'] | default([])) %}
+  - hostname: {{ host }}
+    role: master
+    interfaces:
+      - name: {{ openshift_network_interface }}
+        macAddress: "{{ hostvars[host].mac_address | default('00:50:56:00:00:' ~ ('%02d' | format(loop.index))) }}"
+    networkConfig:
+      interfaces:
+        - name: {{ openshift_network_interface }}
+          type: ethernet
+          state: up
+          ipv4:
+            enabled: true
+            address:
+              - ip: {{ hostvars[host].ansible_host }}
+                prefix-length: {{ openshift_prefix_length }}
+            dhcp: false
+      dns-resolver:
+        config:
+          server:
+            - {{ openshift_dns_server }}
+      routes:
+        config:
+          - destination: 0.0.0.0/0
+            next-hop-address: {{ openshift_gateway_ip }}
+            next-hop-interface: {{ openshift_network_interface }}
+            table-id: 254
+{% endfor %}
+{% for host in (groups['openshift_workers'] | default([])) %}
+  - hostname: {{ host }}
+    role: worker
+    interfaces:
+      - name: {{ openshift_network_interface }}
+        macAddress: "{{ hostvars[host].mac_address | default('00:50:56:00:01:' ~ ('%02d' | format(loop.index))) }}"
+    networkConfig:
+      interfaces:
+        - name: {{ openshift_network_interface }}
+          type: ethernet
+          state: up
+          ipv4:
+            enabled: true
+            address:
+              - ip: {{ hostvars[host].ansible_host }}
+                prefix-length: {{ openshift_prefix_length }}
+            dhcp: false
+      dns-resolver:
+        config:
+          server:
+            - {{ openshift_dns_server }}
+      routes:
+        config:
+          - destination: 0.0.0.0/0
+            next-hop-address: {{ openshift_gateway_ip }}
+            next-hop-interface: {{ openshift_network_interface }}
+            table-id: 254
+{% endfor %}

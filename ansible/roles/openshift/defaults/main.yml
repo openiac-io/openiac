@@ -4,14 +4,19 @@
 # ==============================================================================
 # Unified role supporting both free open-source OKD (default) and commercial
 # Red Hat OpenShift Container Platform (OCP) via 'openshift_edition'.
+# Uses a pluggable engine architecture ('openshift_install_method') for future-proof extensibility.
 
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Pluggable installation engine: "agent" (OpenShift 4.12+ Agent-based Installer standard)
+# Future methods can be added as 'tasks/install_<method>.yml' without modifying main.yml.
+openshift_install_method: "agent"
+
 # Edition selector: "okd" (Free Open-Source, Default) or "ocp" (Red Hat Commercial)
 openshift_edition: "okd"
 
-# Release versions
+# Release versions (Requires 4.12+ for Agent-based Installer)
 openshift_okd_version: "4.15.0-0.okd-2024-03-10-010116"
 openshift_ocp_version: "4.15.12"
 
@@ -19,12 +24,22 @@ openshift_ocp_version: "4.15.12"
 openshift_cluster_name: "openiac-ocp"
 openshift_base_domain: "openiac.local"
 
-# Networking CIDRs
+# Built-in VIPs for Agent-based Installer (Keepalived + HAProxy run natively inside cluster nodes)
+openshift_api_vip: "192.168.56.100"
+openshift_ingress_vip: "192.168.56.101"
+
+# Rendezvous host IP (First control plane node that performs self-bootstrapping)
+openshift_rendezvous_ip: "{{ hostvars[groups['openshift_control_plane'][0]].ansible_host | default('192.168.56.11') }}"
+
+# Node networking defaults for NMState static IP configuration in agent-config.yaml
+openshift_network_interface: "enp0s8"
+openshift_prefix_length: 24
+openshift_gateway_ip: "192.168.56.1"
+openshift_dns_server: "8.8.8.8"
+
+# Cluster SDN CIDRs
 openshift_cluster_network_cidr: "10.128.0.0/14"
 openshift_service_network_cidr: "172.30.0.0/16"
 
 # Default dummy pull secret for OKD (Replace with Red Hat pull secret when using "ocp")
 openshift_pull_secret: '{"auths":{"fake":{"auth":"aWQ6cGFzcwo="}}}'
-
-# Built-in offline local mirror registry port
-openshift_local_registry_port: 5000

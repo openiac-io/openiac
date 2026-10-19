@@ -7,6 +7,9 @@
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Pluggable installation engine: "kolla" (Containerized Kolla-Ansible standard)
+openstack_install_method: "kolla"
+
 # OpenStack Release (e.g., "2023.2" for Bobcat, "2024.1" for Caracal)
 openstack_version: "2023.2"
 
@@ -15,5 +18,5 @@ openstack_network_interface: "enp0s8"
 openstack_neutron_external_interface: "dummy0"
 openstack_vip_address: "192.168.100.250"
 
-# Built-in offline local container registry port (automatically started when airgapped_mode is true)
+# Built-in offline local container registry port
 openstack_local_registry_port: 5000
