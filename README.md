@@ -2,7 +2,7 @@
 
 **OpenIaC** is an enterprise-grade, 100% open-source Infrastructure as Code (IaC) framework designed to provision **Container, Cloud-Native Virtualization, and Private/Public Cloud Platforms** with a single command.
 
-Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, load balancers, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
+Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, agent-based ISO generation, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
 
 ---
 
@@ -12,8 +12,8 @@ Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex ke
 | :--- | :--- | :--- | :---: | :--- |
 | **On-Premise Container** | **`k8s`** | Upstream Kubernetes (`kubeadm` + `containerd` + `Calico`) | ✅ | `make k8s` |
 | **On-Premise Container** | **`k3s`** | Lightweight Kubernetes (SUSE Rancher K3s) | ✅ | `make k3s` |
-| **On-Premise Container** | **`openshift`** | Unified **OKD** (Free Default) & **Red Hat OpenShift (OCP)** | ✅ | `make openshift` |
-| **On-Premise Virtualization** | **`kubevirt`** | Cloud-Native VM Virtualization on K8s / OpenShift | ✅ | `make kubevirt` |
+| **On-Premise Container** | **`openshift`** | Unified **OKD** & **Red Hat OCP** (`Agent-based Installer` 4.12+) | ✅ | `make openshift` |
+| **On-Premise Virtualization** | **`kubevirt`** | Cloud-Native VM Virtualization on K8s / OpenShift (`KubeVirt` + `CDI`) | ✅ | `make kubevirt` |
 | **On-Premise Private Cloud** | **`openstack`** | Private Cloud IaaS (`Kolla-Ansible` Containerized) | ✅ | `make openstack` |
 | **Public Cloud (AWS)** | **`aws`** | Amazon EKS All-in-One Production Platform | — | `make aws-apply` |
 | **Public Cloud (GCP)** | **`gcp`** | Google Kubernetes Engine (GKE) Production Platform | — | `make gcp-apply` |
@@ -90,6 +90,7 @@ make azure-apply
 ---
 
 ## 🛡️ Architecture Principles
-* **Enterprise Linux Standardization**: Optimized for **RHEL / Rocky Linux** with dynamic version compatibility.
-* **Built-in Invisible Helpers**: Load balancers (HAProxy), Cinder LVM volumes, and air-gapped registries are transparently embedded within platform roles—no manual prerequisite setup required.
-* **Zero External Ansible Dependencies**: Built strictly with `ansible.builtin` modules so playbooks run out-of-the-box on minimal `ansible-core` installations.
+* **Enterprise Linux Standardization**: Optimized for **RHEL / Rocky Linux** with dynamic version-open compatibility.
+* **Pluggable Engine Dispatch Pattern**: Every role separates its router (`tasks/main.yml`) from its installation engine (`tasks/install_<method>.yml`), allowing future installation methods to be plugged in without rewriting existing logic.
+* **Self-Healing & Built-in Helpers**: OpenShift static NMState Agent ISOs, OpenStack Cinder LVM volume groups, Neutron dummy interfaces, and KubeVirt emulation fallbacks are configured automatically—no manual prerequisite setup required.
+* **Zero External Ansible Dependencies**: Built strictly with `ansible.builtin` FQCN modules so playbooks run out-of-the-box on minimal `ansible-core` installations.
