@@ -1,0 +1,104 @@
+name: OpenIaC CI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ============================================================================
+  # Job 1: Ansible Playbooks, Pluggable Engines & Jinja2 Template Rendering
+  # ============================================================================
+  ansible-verify:
+    name: Ansible & Jinja2 Schema Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python & install minimal ansible-core (Zero External Dependencies)
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install ansible-core yamllint
+
+      - name: Validate Playbook Syntax across all Tier-1 Topologies (Level 1)
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventories/k3s-sample/hosts.ini playbooks/k3s.yml --syntax-check
+          ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/k8s.yml --syntax-check
+          ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/openshift.yml --syntax-check
+          ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/kubevirt.yml --syntax-check
+          ansible-playbook -i inventories/openstack-sample/hosts.ini playbooks/openstack.yml --syntax-check
+          ansible-playbook -i inventories/unified-sample/hosts.ini playbooks/site.yml --syntax-check
+
+      - name: Validate Pluggable Engine Task Modules (install_<method>.yml)
+        working-directory: ansible
+        run: |
+          for task_file in roles/*/tasks/install_*.yml; do
+            echo "===> Verifying task module: ${task_file}"
+            python3 -c "import yaml, sys; data = yaml.safe_load(open('${task_file}')); assert isinstance(data, list) and len(data) > 0"
+            cat <<EOF > /tmp/verify_engine_play.yml
+          ---
+          - name: Verify Pluggable Engine Module (${task_file})
+            hosts: all
+            gather_facts: false
+            tasks:
+              - name: Import engine tasks for static syntax verification
+                ansible.builtin.import_tasks: "${GITHUB_WORKSPACE}/ansible/${task_file}"
+          EOF
+            ansible-playbook -i inventories/unified-sample/hosts.ini /tmp/verify_engine_play.yml --syntax-check
+          done
+
+      - name: Render Jinja2 Templates & Assert Generated YAML Schemas (Level 2)
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/validate_templates.yml
+
+  # ============================================================================
+  # Job 2: Public Cloud Terraform Blueprints (AWS EKS, GCP GKE, Azure AKS)
+  # ============================================================================
+  terraform-verify:
+    name: Terraform HCL Format & Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: Verify Terraform HCL Formatting (terraform fmt -check)
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Validate AWS EKS, GCP GKE, and Azure AKS Provider Schemas
+        run: |
+          for cloud in aws gcp azure; do
+            echo "===> Validating Terraform module: terraform/${cloud}"
+            terraform -chdir="terraform/${cloud}" init -backend=false
+            terraform -chdir="terraform/${cloud}" validate
+          done
+
+  # ============================================================================
+  # Job 3: Air-Gapped Offline Packager Bash Scripts (Syntax & ShellCheck)
+  # ============================================================================
+  packager-verify:
+    name: Packager Bash & ShellCheck Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Bash Syntax (bash -n)
+        run: |
+          bash -n packager/build_offline_tarball.sh
+          for script in packager/scripts/*.sh; do
+            echo "===> Checking syntax: ${script}"
+            bash -n "${script}"
+          done
+
+      - name: Run ShellCheck Static Analysis
+        run: |
+          shellcheck --severity=warning packager/build_offline_tarball.sh packager/scripts/*.sh
