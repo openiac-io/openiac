@@ -4,7 +4,7 @@
 # Provides a zero-knowledge, user-friendly CLI interface for provisioning
 # on-premise and public cloud platforms with a single command.
 
-.PHONY: help k3s k8s openshift kubevirt openstack \
+.PHONY: help validate k3s k8s openshift kubevirt openstack \
         pack-k3s pack-k8s pack-openshift pack-kubevirt pack-openstack \
         aws-init aws-plan aws-apply gcp-init gcp-plan gcp-apply azure-init azure-plan azure-apply
 
@@ -31,6 +31,9 @@ help:
 	@echo "   make aws-apply        Provision AWS EKS Production Platform"
 	@echo "   make gcp-apply        Provision GCP GKE Production Platform"
 	@echo "   make azure-apply      Provision Azure AKS Production Platform"
+	@echo ""
+	@echo " [4] Automated Quality & Schema Verification:"
+	@echo "   make validate         Run Ansible, Jinja2, Bash, and Terraform validation"
 	@echo "=============================================================================="
 
 # ------------------------------------------------------------------------------
@@ -98,3 +101,22 @@ azure-plan: azure-init
 
 azure-apply: azure-init
 	terraform -chdir=terraform/azure apply
+
+# ------------------------------------------------------------------------------
+# 4. Automated Code & Template Verification Target
+# ------------------------------------------------------------------------------
+validate:
+	@echo "===> [1/3] Validating Ansible Playbooks & Jinja2 Templates..."
+	cd ansible && ansible-playbook -i inventories/k3s-sample/hosts.ini playbooks/k3s.yml --syntax-check
+	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/k8s.yml --syntax-check
+	cd ansible && ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/openshift.yml --syntax-check
+	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/kubevirt.yml --syntax-check
+	cd ansible && ansible-playbook -i inventories/openstack-sample/hosts.ini playbooks/openstack.yml --syntax-check
+	cd ansible && ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/validate_templates.yml
+	@echo "===> [2/3] Validating Packager Bash Scripts..."
+	bash -n packager/build_offline_tarball.sh
+	for s in packager/scripts/*.sh; do bash -n "$$s"; done
+	@echo "===> [3/3] Validating Public Cloud Terraform Modules..."
+	terraform fmt -check -recursive terraform/
+	for d in aws gcp azure; do terraform -chdir=terraform/$$d init -backend=false && terraform -chdir=terraform/$$d validate; done
+	@echo "===> [SUCCESS] All OpenIaC validation checks passed!"

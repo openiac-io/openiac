@@ -1,5 +1,7 @@
 # OpenIaC — Hybrid Cloud & Container Platform Framework
 
+[![OpenIaC CI Quality Gate](https://github.com/openiac-io/openiac/actions/workflows/ci.yml/badge.svg)](https://github.com/openiac-io/openiac/actions/workflows/ci.yml)
+
 **OpenIaC** is an enterprise-grade, 100% open-source Infrastructure as Code (IaC) framework designed to provision **Container, Cloud-Native Virtualization, and Private/Public Cloud Platforms** with a single command.
 
 Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex kernel tuning, agent-based ISO generation, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy production-ready platforms effortlessly.
@@ -25,11 +27,12 @@ Built with a **Zero-Knowledge UX** philosophy, OpenIaC abstracts away complex ke
 
 ```text
 openiac/
+├── .github/workflows/ci.yml # Automated CI Quality Gate (Ansible, Jinja2, Bash, Terraform)
 ├── Makefile                 # One-command CLI entrypoint for all platforms
 ├── ansible/                 # On-Premise & Private Cloud Automation (RHEL / Rocky Linux)
 │   ├── inventories/         # Pre-configured sample topologies (k3s, k8s, openshift, openstack)
-│   ├── playbooks/           # Standalone and unified playbooks
-│   └── roles/               # Modular roles (base_os, k3s, k8s, openshift, kubevirt, openstack)
+│   ├── playbooks/           # Standalone, unified, and template validation playbooks
+│   └── roles/               # Pluggable roles (base_os, k3s, k8s, openshift, kubevirt, openstack)
 ├── terraform/               # Public Cloud Production Blueprints (HCL)
 │   ├── aws/                 # Multi-AZ VPC + Amazon EKS + Managed Node Group
 │   ├── gcp/                 # Dedicated VPC + Google GKE + Managed Node Pool
@@ -85,6 +88,13 @@ make gcp-apply
 
 # Provision Azure AKS on Azure
 make azure-apply
+```
+
+### 4. Automated Code & Schema Validation
+Validate all Ansible playbooks, Jinja2 template renderings, Bash packager scripts, and Terraform HCL schemas with a single command:
+
+```bash
+make validate
 ```
 
 ---

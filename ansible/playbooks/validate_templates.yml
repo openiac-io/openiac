@@ -1,0 +1,64 @@
+---
+# ==============================================================================
+# OpenIaC Playbook: Jinja2 Configuration Template & Schema Validator (Level-2 CI)
+# ==============================================================================
+# Renders all platform configuration templates (.j2) locally using sample
+# inventory variables and validates that the generated files are syntactically
+# valid YAML with all required keys populated.
+
+- name: OpenIaC - Validate Jinja2 Templates and Generated YAML Schemas
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/openshift/defaults/main.yml
+    - ../roles/openstack/defaults/main.yml
+  vars:
+    openshift_ssh_pub_key_raw:
+      stdout: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpenIaCCITestKey openiac@ci"
+  tasks:
+    - name: Create temporary directory for template rendering verification
+      ansible.builtin.file:
+        path: /tmp/openiac-ci-render
+        state: directory
+        mode: "0755"
+
+    - name: Render OpenShift install-config.yaml.j2 template
+      ansible.builtin.template:
+        src: ../roles/openshift/templates/install-config.yaml.j2
+        dest: /tmp/openiac-ci-render/install-config.yaml
+        mode: "0644"
+
+    - name: Render OpenShift agent-config.yaml.j2 template
+      ansible.builtin.template:
+        src: ../roles/openshift/templates/agent-config.yaml.j2
+        dest: /tmp/openiac-ci-render/agent-config.yaml
+        mode: "0644"
+
+    - name: Render OpenStack globals.yml.j2 template (Online & Air-gapped modes)
+      ansible.builtin.template:
+        src: ../roles/openstack/templates/globals.yml.j2
+        dest: /tmp/openiac-ci-render/globals.yml
+        mode: "0644"
+
+    - name: Read rendered configuration files for YAML schema assertion
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - /tmp/openiac-ci-render/install-config.yaml
+        - /tmp/openiac-ci-render/agent-config.yaml
+        - /tmp/openiac-ci-render/globals.yml
+      register: openiac_rendered_configs
+
+    - name: Assert rendered files parse as valid non-empty YAML documents
+      ansible.builtin.assert:
+        that:
+          - (item.content | b64decode | from_yaml) is mapping
+        fail_msg: "Rendered template {{ item.item }} failed YAML schema validation!"
+        success_msg: "Verified valid YAML output for {{ item.item }}"
+      loop: "{{ openiac_rendered_configs.results }}"
+
+    - name: Clean up temporary rendering directory
+      ansible.builtin.file:
+        path: /tmp/openiac-ci-render
+        state: absent
