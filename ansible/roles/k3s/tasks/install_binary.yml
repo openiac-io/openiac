@@ -8,6 +8,20 @@
 - name: Deploy K3s Cluster (Air-gapped or Online)
   block:
     # --------------------------------------------------------------------------
+    # 0. Pre-flight Multi-NIC Network Interface Detection (Flannel CNI)
+    # --------------------------------------------------------------------------
+    - name: "[Pre-flight] Detect network interface bound to ansible_host"
+      ansible.builtin.shell: "ip -o -4 addr show | awk '/{{ ansible_host }}\\// {print $2}' | head -n1"
+      register: k3s_node_iface_raw
+      changed_when: false
+
+    - name: "[Pre-flight] Set Flannel CNI interface argument for multi-NIC nodes"
+      ansible.builtin.set_fact:
+        k3s_flannel_iface_arg: >-
+          {{ ('--flannel-iface ' ~ (k3s_node_iface_raw.stdout | trim))
+             if (k3s_node_iface_raw.stdout | trim | length > 0) else '' }}
+
+    # --------------------------------------------------------------------------
     # 1. Air-gapped (Offline) Artifact Distribution & Control Plane Install
     # --------------------------------------------------------------------------
     - name: "[Offline] Ensure K3s air-gap images directory exists"
@@ -48,7 +62,7 @@
       ansible.builtin.command: /tmp/k3s-install.sh
       environment:
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
-        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }}"
+        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }} {{ k3s_flannel_iface_arg }}"
       when:
         - airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_control_plane']
@@ -69,7 +83,7 @@
       ansible.builtin.command: /tmp/k3s-install-online.sh
       environment:
         INSTALL_K3S_VERSION: "{{ k3s_version }}"
-        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }}"
+        INSTALL_K3S_EXEC: "{{ k3s_server_exec_args }} {{ k3s_flannel_iface_arg }}"
       when:
         - not (airgapped_mode | default(false) | bool)
         - inventory_hostname in groups['k8s_control_plane']
@@ -115,7 +129,7 @@
         INSTALL_K3S_SKIP_DOWNLOAD: "true"
         K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
         K3S_TOKEN: "{{ k3s_join_token }}"
-        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }}"
+        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }} {{ k3s_flannel_iface_arg }}"
       when:
         - airgapped_mode | default(false) | bool
         - inventory_hostname in groups['k8s_workers']
@@ -128,7 +142,7 @@
         INSTALL_K3S_VERSION: "{{ k3s_version }}"
         K3S_URL: "https://{{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}:6443"
         K3S_TOKEN: "{{ k3s_join_token }}"
-        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }}"
+        INSTALL_K3S_EXEC: "{{ k3s_agent_exec_args }} {{ k3s_flannel_iface_arg }}"
       when:
         - not (airgapped_mode | default(false) | bool)
         - inventory_hostname in groups['k8s_workers']
