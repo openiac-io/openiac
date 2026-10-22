@@ -4,10 +4,11 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. Deployment Mode
+# 1. Deployment Mode & Engine
 # ------------------------------------------------------------------------------
 # Set to 'true' for air-gapped environments (requires artifacts in packager/artifacts/k8s)
 airgapped_mode: false
+k8s_install_method: "kubeadm"
 
 # ------------------------------------------------------------------------------
 # 2. Upstream Kubernetes (Kubeadm) Configuration
@@ -18,8 +19,13 @@ k8s_pod_network_cidr: "192.168.0.0/16"
 k8s_calico_version: "v3.27.2"
 
 # ------------------------------------------------------------------------------
-# 3. Cloud-Native Virtualization (KubeVirt) Configuration
+# 3. Layer-3 Add-ons & Day-2 Lifecycle (KubeVirt Cloud-Native Virtualization)
 # ------------------------------------------------------------------------------
+# Set enable_kubevirt_addon: true to automatically install KubeVirt during 'make k8s'
+enable_kubevirt_addon: false
+
+# Lifecycle state: "present" (install or upgrade) | "absent" (clean uninstall)
+kubevirt_state: "present"
 kubevirt_version: "v1.2.0"
 kubevirt_cdi_version: "v1.59.0"
 kubevirt_auto_emulation_fallback: true

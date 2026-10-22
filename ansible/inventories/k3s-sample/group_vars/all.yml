@@ -1,33 +1,24 @@
 ---
 # ==============================================================================
-# OpenIaC Global Configuration
+# OpenIaC Global Configuration (Lightweight Kubernetes — K3s)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. Deployment Mode
+# 1. Deployment Mode & Engine
 # ------------------------------------------------------------------------------
-# Set to 'true' if the target servers have NO internet access.
-# If true, you MUST place the required offline artifacts in packager/artifacts/
-airgapped_mode: true
+# Set to 'true' for air-gapped environments (requires artifacts in packager/artifacts/k3s)
+airgapped_mode: false
+k3s_install_method: "binary"
 
 # ------------------------------------------------------------------------------
+# 2. SUSE Rancher K3s Configuration
 # ------------------------------------------------------------------------------
-# 🚨 [COMPATIBILITY MATRIX]
-# Please ensure your target bare-metal OS matches the required version below.
-# 
-# [Solution Version]         [Official Target OS Compatibility]
-# - v1.27.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
-# - v1.28.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
-# - v1.29.x+k3s*   ----->  RHEL / Rocky Linux 8.x or 9.x
-# ------------------------------------------------------------------------------
-# 2. Kubernetes (K3s) Configuration
-# ------------------------------------------------------------------------------
-# The specific version of K3s to install.
-# You can use ANY valid K3s release tag from the official GitHub releases page:
-# 👉 https://github.com/k3s-io/k3s/releases
-#
-# Note: Ensure the version string exactly matches the GitHub tag (e.g., v1.28.4+k3s2)
-# If airgapped_mode=true, the offline artifacts for this exact version must exist.
 k3s_version: "v1.28.4+k3s2"
 
-
+# ------------------------------------------------------------------------------
+# 3. Layer-3 Add-ons & Day-2 Lifecycle (KubeVirt Cloud-Native Virtualization)
+# ------------------------------------------------------------------------------
+# Set enable_kubevirt_addon: true to automatically install KubeVirt during 'make k3s'
+enable_kubevirt_addon: false
+kubevirt_state: "present"
+kubevirt_version: "v1.2.0"

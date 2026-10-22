@@ -2,16 +2,22 @@
 # ==============================================================================
 # OpenIaC Ansible Role Defaults: KubeVirt (Cloud-Native VM Virtualization)
 # ==============================================================================
-# Deploys KubeVirt and Containerized Data Importer (CDI) onto an existing
-# Kubernetes (k8s/k3s/openshift) cluster to unify VMs and containers.
+# Deploys, upgrades, or uninstalls KubeVirt and Containerized Data Importer (CDI)
+# on top of Kubernetes (k8s/k3s) or OpenShift/OKD clusters.
 
 # Air-gapped (Offline) deployment toggle
 airgapped_mode: false
 
+# Composable Add-on toggle when running base platform playbooks (k8s, k3s, openshift)
+enable_kubevirt_addon: false
+
+# Day-2 Lifecycle state: "present" (install or upgrade) | "absent" (clean uninstall)
+kubevirt_state: "present"
+
 # Pluggable installation engine: "operator" (Official KubeVirt Operator & CDI CRDs)
 kubevirt_install_method: "operator"
 
-# KubeVirt & CDI release versions
+# KubeVirt & CDI release versions (Change version and re-run to upgrade/rollback)
 kubevirt_version: "v1.2.0"
 kubevirt_cdi_version: "v1.59.0"
 

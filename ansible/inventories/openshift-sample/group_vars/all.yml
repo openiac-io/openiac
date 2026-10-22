@@ -25,3 +25,11 @@ openshift_cluster_name: "openiac-ocp"
 openshift_base_domain: "openiac.local"
 openshift_api_vip: "192.168.56.100"
 openshift_ingress_vip: "192.168.56.101"
+
+# ------------------------------------------------------------------------------
+# 4. Layer-3 Add-ons & Day-2 Lifecycle (KubeVirt / OpenShift Virtualization)
+# ------------------------------------------------------------------------------
+# Set enable_kubevirt_addon: true to automatically install KubeVirt during 'make openshift'
+enable_kubevirt_addon: false
+kubevirt_state: "present"
+kubevirt_version: "v1.2.0"

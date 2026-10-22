@@ -1,12 +1,12 @@
 ---
 # ==============================================================================
-# OpenIaC Ansible Role: KubeVirt (Cloud-Native Virtualization)
+# OpenIaC Ansible Role Engine: KubeVirt Install & Upgrade (Operator Standard)
 # ==============================================================================
-# Transforms any Kubernetes cluster into a unified VM & Container hypervisor.
-# Automatically detects hardware KVM support and falls back to software
-# emulation when running inside nested VMs for a zero-failure user experience.
+# Deploys or upgrades KubeVirt and CDI onto any Kubernetes (k8s/k3s) or
+# OpenShift/OKD cluster. Automatically enables QEMU software emulation when
+# hardware KVM (/dev/kvm) is unavailable.
 
-- name: Deploy KubeVirt Cloud-Native Virtualization Stack
+- name: Deploy or Upgrade KubeVirt Cloud-Native Virtualization Stack
   block:
     # --------------------------------------------------------------------------
     # 1. Hardware KVM Check & Self-Healing Emulation Detection
@@ -19,16 +19,16 @@
     # --------------------------------------------------------------------------
     # 2. Air-gapped (Offline) Manifest & CLI Deployment
     # --------------------------------------------------------------------------
-    - name: "[Offline] Copy KubeVirt manifests and virtctl CLI to control plane"
+    - name: "[Offline] Copy KubeVirt manifests and virtctl CLI to cluster management node"
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../../packager/artifacts/kubevirt/"
         dest: /tmp/openiac-kubevirt-artifacts/
         mode: "0755"
       when:
         - airgapped_mode | default(false) | bool
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
 
-    - name: "[Offline] Install virtctl CLI binary on control plane"
+    - name: "[Offline] Install virtctl CLI binary on cluster management node"
       ansible.builtin.copy:
         src: "/tmp/openiac-kubevirt-artifacts/virtctl-{{ kubevirt_version }}-linux-amd64"
         dest: /usr/local/bin/virtctl
@@ -36,12 +36,12 @@
         mode: "0755"
       when:
         - airgapped_mode | default(false) | bool
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
 
-    - name: "[Offline] Apply KubeVirt Operator and CR manifests"
+    - name: "[Offline] Apply KubeVirt and CDI Operator & CR manifests (Install / Upgrade)"
       ansible.builtin.command: "kubectl apply -f /tmp/openiac-kubevirt-artifacts/{{ item }}"
       environment:
-        KUBECONFIG: /root/.kube/config
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
       loop:
         - kubevirt-operator.yaml
         - kubevirt-cr.yaml
@@ -49,25 +49,25 @@
         - cdi-cr.yaml
       when:
         - airgapped_mode | default(false) | bool
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
       changed_when: true
 
     # --------------------------------------------------------------------------
     # 3. Online Manifest & CLI Deployment
     # --------------------------------------------------------------------------
-    - name: "[Online] Download and install virtctl CLI binary on control plane"
+    - name: "[Online] Download and install virtctl CLI binary ({{ kubevirt_version }})"
       ansible.builtin.get_url:
         url: "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/virtctl-{{ kubevirt_version }}-linux-amd64"
         dest: /usr/local/bin/virtctl
         mode: "0755"
       when:
         - not (airgapped_mode | default(false) | bool)
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
 
-    - name: "[Online] Deploy KubeVirt Operator and Custom Resource"
+    - name: "[Online] Apply KubeVirt and CDI Operator & CR manifests (Install / Upgrade)"
       ansible.builtin.command: "kubectl apply -f {{ item }}"
       environment:
-        KUBECONFIG: /root/.kube/config
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
       loop:
         - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-operator.yaml"
         - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-cr.yaml"
@@ -75,7 +75,7 @@
         - "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ kubevirt_cdi_version }}/cdi-cr.yaml"
       when:
         - not (airgapped_mode | default(false) | bool)
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
       changed_when: true
 
     # --------------------------------------------------------------------------
@@ -86,9 +86,9 @@
         kubectl patch kubevirt kubevirt -n kubevirt --type merge
         -p '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}'
       environment:
-        KUBECONFIG: /root/.kube/config
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
       when:
-        - inventory_hostname == groups['k8s_control_plane'][0]
+        - inventory_hostname == kubevirt_target_node
         - kubevirt_auto_emulation_fallback | bool
         - not kubevirt_kvm_device.stat.exists
       changed_when: true
@@ -96,8 +96,8 @@
     - name: Wait for KubeVirt deployment to reach Available phase
       ansible.builtin.command: kubectl wait kubevirt.kubevirt.io/kubevirt -n kubevirt --for=condition=Available --timeout=300s
       environment:
-        KUBECONFIG: /root/.kube/config
-      when: inventory_hostname == groups['k8s_control_plane'][0]
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+      when: inventory_hostname == kubevirt_target_node
       changed_when: false
 
   always:
