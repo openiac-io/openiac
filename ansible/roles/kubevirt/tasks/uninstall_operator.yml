@@ -1,0 +1,68 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Engine: KubeVirt Uninstall (Day-2 Lifecycle Teardown)
+# ==============================================================================
+# Cleanly removes KubeVirt and CDI Custom Resources, Operators, and the virtctl
+# CLI binary from the cluster while keeping the underlying Kubernetes/OpenShift
+# platform 100% intact.
+
+- name: Uninstall KubeVirt Cloud-Native Virtualization Stack
+  block:
+    # --------------------------------------------------------------------------
+    # 1. Air-gapped (Offline) Manifest Removal
+    # --------------------------------------------------------------------------
+    - name: "[Offline] Copy KubeVirt manifests for clean uninstallation"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../packager/artifacts/kubevirt/"
+        dest: /tmp/openiac-kubevirt-artifacts/
+        mode: "0755"
+      when:
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname == kubevirt_target_node
+
+    - name: "[Offline] Delete CDI and KubeVirt Custom Resources & Operators in reverse order"
+      ansible.builtin.command: "kubectl delete -f /tmp/openiac-kubevirt-artifacts/{{ item }} --ignore-not-found=true"
+      environment:
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+      loop:
+        - cdi-cr.yaml
+        - cdi-operator.yaml
+        - kubevirt-cr.yaml
+        - kubevirt-operator.yaml
+      when:
+        - airgapped_mode | default(false) | bool
+        - inventory_hostname == kubevirt_target_node
+      changed_when: true
+
+    # --------------------------------------------------------------------------
+    # 2. Online Manifest Removal
+    # --------------------------------------------------------------------------
+    - name: "[Online] Delete CDI and KubeVirt Custom Resources & Operators in reverse order"
+      ansible.builtin.command: "kubectl delete -f {{ item }} --ignore-not-found=true"
+      environment:
+        KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+      loop:
+        - "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ kubevirt_cdi_version }}/cdi-cr.yaml"
+        - "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ kubevirt_cdi_version }}/cdi-operator.yaml"
+        - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-cr.yaml"
+        - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-operator.yaml"
+      when:
+        - not (airgapped_mode | default(false) | bool)
+        - inventory_hostname == kubevirt_target_node
+      changed_when: true
+
+    # --------------------------------------------------------------------------
+    # 3. Remove virtctl CLI Binary
+    # --------------------------------------------------------------------------
+    - name: Remove virtctl CLI binary from cluster management node
+      ansible.builtin.file:
+        path: /usr/local/bin/virtctl
+        state: absent
+      when: inventory_hostname == kubevirt_target_node
+
+  always:
+    - name: Clean up temporary KubeVirt artifact directory
+      ansible.builtin.file:
+        path: /tmp/openiac-kubevirt-artifacts
+        state: absent
+      failed_when: false

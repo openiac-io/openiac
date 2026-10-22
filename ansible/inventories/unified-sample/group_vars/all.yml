@@ -9,10 +9,16 @@
 airgapped_mode: false
 
 # ------------------------------------------------------------------------------
-# 2. Container & Virtualization Platform Versions
+# 2. Core Platform Versions
 # ------------------------------------------------------------------------------
 k3s_version: "v1.28.4+k3s2"
 k8s_version: "1.29.3"
 openshift_edition: "okd"
-kubevirt_version: "v1.2.0"
 openstack_version: "2023.2"
+
+# ------------------------------------------------------------------------------
+# 3. Layer-3 Add-ons & Day-2 Lifecycle
+# ------------------------------------------------------------------------------
+enable_kubevirt_addon: false
+kubevirt_state: "present"
+kubevirt_version: "v1.2.0"

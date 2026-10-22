@@ -1,6 +1,6 @@
 ---
 # ==============================================================================
-# OpenIaC Playbook: Lightweight Kubernetes (K3s)
+# OpenIaC Playbook: Lightweight Kubernetes (K3s) & Optional Layer-3 Add-ons
 # ==============================================================================
 - name: OpenIaC - K3s Cluster Deployment
   hosts: all
@@ -8,3 +8,5 @@
   roles:
     - role: base_os
     - role: k3s
+    - role: kubevirt
+      when: enable_kubevirt_addon | default(false) | bool

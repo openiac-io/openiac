@@ -1,8 +1,56 @@
 ---
 # ==============================================================================
-# OpenIaC Playbook: KubeVirt Cloud-Native Virtualization
+# OpenIaC Playbook: KubeVirt Cloud-Native Virtualization (Turnkey & Add-on)
 # ==============================================================================
-- name: OpenIaC - KubeVirt Virtualization Deployment
+# Supports two seamless execution modes:
+#   1. Turnkey All-in-One Mode: On fresh servers without an existing cluster,
+#      automatically provisions Base OS + Upstream Kubernetes (k8s) + KubeVirt.
+#   2. Add-on / Day-2 Lifecycle Mode: On existing Kubernetes (k8s/k3s) or
+#      OpenShift/OKD clusters, installs, upgrades, or uninstalls KubeVirt.
+
+- name: "[Pre-flight] Detect existing Kubernetes or OpenShift cluster state"
+  hosts: all
+  become: true
+  tasks:
+    - name: Check if standard Kubernetes/K3s kubeconfig (/root/.kube/config) exists
+      ansible.builtin.stat:
+        path: /root/.kube/config
+      register: openiac_k8s_kubeconfig
+
+    - name: Check if OpenShift kubeconfig (/opt/openiac-openshift/auth/kubeconfig) exists
+      ansible.builtin.stat:
+        path: "{{ openshift_install_dir | default('/opt/openiac-openshift') }}/auth/kubeconfig"
+      register: openiac_ocp_kubeconfig
+
+    - name: Set cluster presence fact across all nodes
+      ansible.builtin.set_fact:
+        openiac_cluster_exists: >-
+          {{
+            (
+              'openshift_bastion' in groups and (groups['openshift_bastion'] | length) > 0 and
+              (hostvars[groups['openshift_bastion'][0]].openiac_ocp_kubeconfig.stat.exists | default(false))
+            ) or (
+              'k8s_control_plane' in groups and (groups['k8s_control_plane'] | length) > 0 and
+              (hostvars[groups['k8s_control_plane'][0]].openiac_k8s_kubeconfig.stat.exists | default(false))
+            )
+          }}
+
+- name: "[Turnkey Mode] Auto-provision Base OS and Kubernetes if no cluster exists yet"
+  hosts: all
+  become: true
+  roles:
+    - role: base_os
+      when:
+        - (kubevirt_state | default('present')) == 'present'
+        - not (openiac_cluster_exists | default(false) | bool)
+        - "'openshift_bastion' not in groups"
+    - role: k8s
+      when:
+        - (kubevirt_state | default('present')) == 'present'
+        - not (openiac_cluster_exists | default(false) | bool)
+        - "'openshift_bastion' not in groups"
+
+- name: "[Layer-3 Virtualization] Deploy, Upgrade, or Uninstall KubeVirt Stack"
   hosts: all
   become: true
   roles:

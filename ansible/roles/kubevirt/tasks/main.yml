@@ -1,11 +1,53 @@
 ---
 # ==============================================================================
-# OpenIaC Ansible Role Entrypoint: KubeVirt (Cloud-Native Virtualization)
+# OpenIaC Ansible Role Router: KubeVirt (Lifecycle & Pluggable Engine Dispatch)
 # ==============================================================================
-# Dynamically dispatches the selected KubeVirt installation engine (e.g., install_operator.yml).
+# Validates version/state parameters, auto-detects the underlying container
+# platform (k8s/k3s vs. openshift), and routes to install or uninstall tasks.
 
-# ------------------------------------------------------------------------------
-# 1. Pluggable Installation Engine Dispatch
-# ------------------------------------------------------------------------------
-- name: "Dispatch KubeVirt installation engine ({{ kubevirt_install_method }})"
+- name: "[Pre-flight] Verify KubeVirt version meets OpenIaC minimum standard (v1.0.0+)"
+  ansible.builtin.assert:
+    that:
+      - (kubevirt_version | regex_replace('^v', '')) is version('1.0.0', '>=')
+    fail_msg: >-
+      Unsupported KubeVirt version ({{ kubevirt_version }}).
+      OpenIaC requires KubeVirt v1.0.0 or higher.
+    success_msg: "Verified KubeVirt target version ({{ kubevirt_version }})"
+
+- name: "[Pre-flight] Verify KubeVirt lifecycle state and installation engine"
+  ansible.builtin.assert:
+    that:
+      - kubevirt_state in ['present', 'absent']
+      - kubevirt_install_method in ['operator']
+    fail_msg: >-
+      Invalid KubeVirt configuration (state={{ kubevirt_state }},
+      method={{ kubevirt_install_method }}). Supported states: ['present', 'absent'].
+      Supported methods: ['operator'].
+    success_msg: "Selected KubeVirt lifecycle state: {{ kubevirt_state }} (engine: {{ kubevirt_install_method }})"
+
+- name: "[Pre-flight] Auto-detect target cluster control node and kubeconfig path (K8s/K3s vs. OpenShift)"
+  ansible.builtin.set_fact:
+    kubevirt_target_node: >-
+      {{
+        groups['openshift_bastion'][0]
+        if ('openshift_bastion' in groups and (groups['openshift_bastion'] | length) > 0)
+        else (
+          groups['k8s_control_plane'][0]
+          if ('k8s_control_plane' in groups and (groups['k8s_control_plane'] | length) > 0)
+          else inventory_hostname
+        )
+      }}
+    kubevirt_kubeconfig_path: >-
+      {{
+        (openshift_install_dir | default('/opt/openiac-openshift')) ~ '/auth/kubeconfig'
+        if ('openshift_bastion' in groups and (groups['openshift_bastion'] | length) > 0)
+        else '/root/.kube/config'
+      }}
+
+- name: Dispatch to KubeVirt installation / upgrade engine ({{ kubevirt_install_method }})
   ansible.builtin.include_tasks: "install_{{ kubevirt_install_method }}.yml"
+  when: kubevirt_state == 'present'
+
+- name: Dispatch to KubeVirt uninstallation engine ({{ kubevirt_install_method }})
+  ansible.builtin.include_tasks: "uninstall_{{ kubevirt_install_method }}.yml"
+  when: kubevirt_state == 'absent'

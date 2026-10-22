@@ -29,13 +29,14 @@ jobs:
           ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/k8s.yml --syntax-check
           ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/openshift.yml --syntax-check
           ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/kubevirt.yml --syntax-check
+          ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/kubevirt.yml --syntax-check
           ansible-playbook -i inventories/openstack-sample/hosts.ini playbooks/openstack.yml --syntax-check
           ansible-playbook -i inventories/unified-sample/hosts.ini playbooks/site.yml --syntax-check
 
-      - name: Validate Pluggable Engine Task Modules (install_<method>.yml)
+      - name: Validate Pluggable Lifecycle & Engine Task Modules (install_*.yml & uninstall_*.yml)
         working-directory: ansible
         run: |
-          for task_file in roles/*/tasks/install_*.yml; do
+          for task_file in roles/*/tasks/install_*.yml roles/*/tasks/uninstall_*.yml; do
             echo "===> Verifying task module: ${task_file}"
             python3 -c "import yaml, sys; data = yaml.safe_load(open('${task_file}')); assert isinstance(data, list) and len(data) > 0"
             cat <<EOF > /tmp/verify_engine_play.yml
