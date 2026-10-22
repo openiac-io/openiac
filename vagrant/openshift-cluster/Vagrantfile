@@ -24,7 +24,7 @@ Vagrant.configure("2") do |config|
   SHELL
 
   # ----------------------------------------------------------------------------
-  # 1. OpenShift Agent ISO Provisioner Node (bastion-01)
+  # 1. OpenShift Agent ISO Provisioner & Ansible Control Node (bastion-01)
   # ----------------------------------------------------------------------------
   config.vm.define "bastion-01" do |node|
     node.vm.hostname = "bastion-01"
@@ -33,6 +33,10 @@ Vagrant.configure("2") do |config|
       vb.memory = "4096"
       vb.cpus = 2
     end
+    node.vm.provision "shell", inline: <<-SHELL
+      echo "Bootstrapping OpenIaC Control Node dependencies (make, ansible-core, sshpass)..."
+      dnf install -y make epel-release && dnf install -y ansible-core sshpass
+    SHELL
   end
 
   # ----------------------------------------------------------------------------

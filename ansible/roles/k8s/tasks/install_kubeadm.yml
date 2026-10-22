@@ -46,15 +46,15 @@
       ansible.builtin.dnf:
         name:
           - containerd.io
-          - "kubelet-{{ k8s_version }}"
-          - "kubeadm-{{ k8s_version }}"
-          - "kubectl-{{ k8s_version }}"
+          - "kubelet-{{ k8s_version }}*"
+          - "kubeadm-{{ k8s_version }}*"
+          - "kubectl-{{ k8s_version }}*"
           - iproute-tc
         state: present
       when: not (airgapped_mode | default(false) | bool)
 
     # --------------------------------------------------------------------------
-    # 2. Containerd SystemdCgroup Configuration
+    # 2. Containerd SystemdCgroup & Kubelet Multi-NIC Node-IP Configuration
     # --------------------------------------------------------------------------
     - name: Ensure /etc/containerd directory exists
       ansible.builtin.file:
@@ -62,12 +62,25 @@
         state: directory
         mode: "0755"
 
-    - name: Generate default containerd configuration with SystemdCgroup enabled
+    - name: Check if containerd CRI plugin and SystemdCgroup are already configured
+      ansible.builtin.command: grep -q "SystemdCgroup = true" /etc/containerd/config.toml
+      register: k8s_containerd_cgroup_check
+      failed_when: false
+      changed_when: false
+
+    - name: Generate default containerd configuration with CRI & SystemdCgroup enabled
       ansible.builtin.shell: |
         containerd config default > /etc/containerd/config.toml
         sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
-      args:
-        creates: /etc/containerd/config.toml
+      when: k8s_containerd_cgroup_check.rc != 0
+      changed_when: true
+
+    - name: Configure kubelet node-ip to bind to the cluster private network interface
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/kubelet
+        content: |
+          KUBELET_EXTRA_ARGS="--node-ip={{ ansible_host }}"
+        mode: "0644"
 
     - name: Enable and start containerd and kubelet services
       ansible.builtin.systemd:
@@ -147,6 +160,17 @@
         - ansible_user is defined
         - ansible_user != "root"
 
+    - name: Export KUBECONFIG automatically in ansible_user .bashrc
+      ansible.builtin.lineinfile:
+        path: "/home/{{ ansible_user }}/.bashrc"
+        line: "export KUBECONFIG=~/.kube/config"
+        create: true
+        mode: "0644"
+      when:
+        - inventory_hostname == groups['k8s_control_plane'][0]
+        - ansible_user is defined
+        - ansible_user != "root"
+
     - name: "[Offline] Apply Calico CNI manifest from local artifact"
       ansible.builtin.command: kubectl apply -f /tmp/openiac-k8s-artifacts/manifests/calico.yaml
       environment:
@@ -164,6 +188,15 @@
       when:
         - not (airgapped_mode | default(false) | bool)
         - inventory_hostname == groups['k8s_control_plane'][0]
+      changed_when: true
+
+    - name: Configure Calico IP autodetection to bind to the cluster private network
+      ansible.builtin.command: >-
+        kubectl set env daemonset/calico-node -n kube-system
+        IP_AUTODETECTION_METHOD=can-reach={{ hostvars[groups['k8s_control_plane'][0]].ansible_host }}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: inventory_hostname == groups['k8s_control_plane'][0]
       changed_when: true
 
     # --------------------------------------------------------------------------

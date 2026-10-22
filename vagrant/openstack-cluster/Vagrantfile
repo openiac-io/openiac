@@ -5,9 +5,6 @@
 # OpenIaC: OpenStack Cluster Test Environment (Controller + Compute)
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# 💻 OS Selection
-# ------------------------------------------------------------------------------
 TARGET_OS = "bento/rockylinux-9"
 
 Vagrant.configure("2") do |config|
@@ -29,12 +26,15 @@ Vagrant.configure("2") do |config|
   SHELL
 
   # ----------------------------------------------------------------------------
-  # 1. OpenStack Controller Node (controller-01)
+  # 1. OpenStack Controller & Ansible Control Node (controller-01)
   # ----------------------------------------------------------------------------
   config.vm.define "controller-01" do |node|
     node.vm.hostname = "controller-01"
-    # Management network IP
     node.vm.network "private_network", ip: "192.168.100.30"
+    node.vm.provision "shell", inline: <<-SHELL
+      echo "Bootstrapping OpenIaC Control Node dependencies (make, ansible-core, sshpass)..."
+      dnf install -y make epel-release && dnf install -y ansible-core sshpass
+    SHELL
   end
 
   # ----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "compute-01" do |node|
     node.vm.hostname = "compute-01"
     node.vm.network "private_network", ip: "192.168.100.31"
-    
+
     # Attach a secondary 40GB disk for Cinder Volumes
     node.vm.provider "virtualbox" do |vb|
       disk_path = "./compute-cinder-volumes.vdi"
@@ -53,5 +53,4 @@ Vagrant.configure("2") do |config|
       vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", "1", "--device", "0", "--type", "hdd", "--medium", disk_path]
     end
   end
-
 end

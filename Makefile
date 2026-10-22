@@ -4,7 +4,11 @@
 # Provides a zero-knowledge, user-friendly CLI interface for provisioning
 # on-premise and public cloud platforms with a single command.
 
-.PHONY: help validate k3s k8s openshift kubevirt openshift-kubevirt kubevirt-uninstall openstack \
+export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
+export ANSIBLE_ROLES_PATH := $(CURDIR)/ansible/roles
+export ANSIBLE_HOST_KEY_CHECKING := False
+
+.PHONY: help ensure-ansible validate k3s k8s openshift kubevirt openshift-kubevirt kubevirt-uninstall openstack \
         pack-k3s pack-k8s pack-openshift pack-kubevirt pack-openstack \
         aws-init aws-plan aws-apply gcp-init gcp-plan gcp-apply azure-init azure-plan azure-apply
 
@@ -39,27 +43,47 @@ help:
 	@echo "=============================================================================="
 
 # ------------------------------------------------------------------------------
+# 0. Self-Healing Control Node Prerequisite Check
+# ------------------------------------------------------------------------------
+ensure-ansible:
+	@if ! command -v ansible-playbook >/dev/null 2>&1 || ! command -v sshpass >/dev/null 2>&1; then \
+		echo "===> [OpenIaC Self-Healing] 'ansible-playbook' or 'sshpass' not found on this control node."; \
+		echo "===> [OpenIaC Self-Healing] Automatically installing Ansible Engine & sshpass..."; \
+		if [ -d "$(CURDIR)/packager/artifacts/ansible-bootstrap" ] && ls "$(CURDIR)/packager/artifacts/ansible-bootstrap/"*.rpm >/dev/null 2>&1; then \
+			sudo dnf install -y --disablerepo='*' "$(CURDIR)/packager/artifacts/ansible-bootstrap/"*.rpm; \
+		elif command -v dnf >/dev/null 2>&1; then \
+			sudo dnf install -y epel-release && sudo dnf install -y ansible-core sshpass; \
+		elif command -v apt-get >/dev/null 2>&1; then \
+			sudo apt-get update && sudo apt-get install -y ansible sshpass; \
+		else \
+			echo "[ERROR] Unsupported package manager. Please install ansible-core and sshpass manually."; \
+			exit 1; \
+		fi; \
+		echo "===> [OpenIaC Self-Healing] Ansible Engine & sshpass are ready!"; \
+	fi
+
+# ------------------------------------------------------------------------------
 # 1. On-Premise Platform & Lifecycle Targets
 # ------------------------------------------------------------------------------
-k3s:
+k3s: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/k3s-sample/hosts.ini playbooks/k3s.yml
 
-k8s:
+k8s: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/k8s.yml
 
-openshift:
+openshift: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/openshift.yml
 
-kubevirt:
+kubevirt: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/kubevirt.yml
 
-openshift-kubevirt:
+openshift-kubevirt: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/openshift-sample/hosts.ini playbooks/kubevirt.yml
 
-kubevirt-uninstall:
+kubevirt-uninstall: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/kubevirt.yml -e kubevirt_state=absent
 
-openstack:
+openstack: ensure-ansible
 	cd ansible && ansible-playbook -i inventories/openstack-sample/hosts.ini playbooks/openstack.yml
 
 # ------------------------------------------------------------------------------
@@ -113,7 +137,7 @@ azure-apply: azure-init
 # ------------------------------------------------------------------------------
 # 4. Automated Code & Template Verification Target
 # ------------------------------------------------------------------------------
-validate:
+validate: ensure-ansible
 	@echo "===> [1/3] Validating Ansible Playbooks & Jinja2 Templates..."
 	cd ansible && ansible-playbook -i inventories/k3s-sample/hosts.ini playbooks/k3s.yml --syntax-check
 	cd ansible && ansible-playbook -i inventories/k8s-sample/hosts.ini playbooks/k8s.yml --syntax-check

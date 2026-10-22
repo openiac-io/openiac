@@ -3,7 +3,8 @@
 # OpenIaC Ansible Role: Base OS Configuration (RHEL / Rocky Linux)
 # ==============================================================================
 # Prepares Enterprise Linux hosts with required kernel modules, sysctl tuning,
-# and security baseline adjustments for container and cloud platforms.
+# /etc/hosts cluster resolution, and security baseline adjustments for
+# container and cloud platforms.
 # Uses strictly built-in Ansible modules for zero external collection dependencies.
 
 # ------------------------------------------------------------------------------
@@ -20,7 +21,19 @@
       Verified compatible Enterprise Linux OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
 
 # ------------------------------------------------------------------------------
-# 2. Memory & Swap Configuration
+# 2. Cluster Hostname & Private IP Resolution (/etc/hosts)
+# ------------------------------------------------------------------------------
+- name: Ensure all cluster inventory nodes are resolvable via /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s+{{ item }}$'
+    line: "{{ hostvars[item].ansible_host }} {{ item }}"
+    state: present
+  loop: "{{ groups['all'] }}"
+  when: hostvars[item].ansible_host is defined
+
+# ------------------------------------------------------------------------------
+# 3. Memory & Swap Configuration
 # ------------------------------------------------------------------------------
 - name: Disable active swap memory (Required for Kubernetes kubelet stability)
   ansible.builtin.command: swapoff -a
@@ -34,7 +47,7 @@
     replace: '# \1'
 
 # ------------------------------------------------------------------------------
-# 3. Security & Firewall Baseline
+# 4. Security & Firewall Baseline
 # ------------------------------------------------------------------------------
 - name: Set SELinux to permissive mode at runtime
   ansible.builtin.command: setenforce 0
@@ -60,7 +73,7 @@
   failed_when: false
 
 # ------------------------------------------------------------------------------
-# 4. Kernel Modules & Network Sysctl Tuning
+# 5. Kernel Modules & Network Sysctl Tuning
 # ------------------------------------------------------------------------------
 - name: Persist required kernel modules across reboots
   ansible.builtin.copy:

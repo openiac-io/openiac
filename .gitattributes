@@ -1,0 +1,12 @@
+# Enforce Unix LF line endings across all files so Linux Vagrant VMs (/openiac)
+# can execute Makefiles, Bash scripts, and Ansible YAML files without CRLF errors.
+* text=auto eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.j2 text eol=lf
+*.tf text eol=lf
+Makefile text eol=lf
+Vagrantfile text eol=lf
