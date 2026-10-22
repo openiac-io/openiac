@@ -42,6 +42,7 @@
       ansible.builtin.command: "kubectl apply -f /tmp/openiac-kubevirt-artifacts/{{ item }}"
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       loop:
         - kubevirt-operator.yaml
         - kubevirt-cr.yaml
@@ -64,10 +65,19 @@
         - not (airgapped_mode | default(false) | bool)
         - inventory_hostname == kubevirt_target_node
 
+    - name: Symlink virtctl into /usr/bin for sudo secure_path compatibility
+      ansible.builtin.file:
+        src: /usr/local/bin/virtctl
+        dest: /usr/bin/virtctl
+        state: link
+        force: true
+      when: inventory_hostname == kubevirt_target_node
+
     - name: "[Online] Apply KubeVirt and CDI Operator & CR manifests (Install / Upgrade)"
       ansible.builtin.command: "kubectl apply -f {{ item }}"
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       loop:
         - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-operator.yaml"
         - "https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-cr.yaml"
@@ -87,6 +97,7 @@
         -p '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}'
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       when:
         - inventory_hostname == kubevirt_target_node
         - kubevirt_auto_emulation_fallback | bool
@@ -97,6 +108,7 @@
       ansible.builtin.command: kubectl wait kubevirt.kubevirt.io/kubevirt -n kubevirt --for=condition=Available --timeout=300s
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       when: inventory_hostname == kubevirt_target_node
       changed_when: false
 

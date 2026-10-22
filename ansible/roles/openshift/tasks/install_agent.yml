@@ -32,6 +32,13 @@
     # --------------------------------------------------------------------------
     # 2. Air-gapped vs Online Binary Installation (openshift-install & oc)
     # --------------------------------------------------------------------------
+    - name: Check if openshift-install and oc binaries are already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/openshift-install
+      register: openshift_install_bin
+      delegate_to: localhost
+      run_once: true
+
     - name: "[Offline] Extract openshift-install and oc CLI from local artifacts"
       ansible.builtin.unarchive:
         src: "{{ item }}"
@@ -41,7 +48,9 @@
       loop:
         - "{{ playbook_dir }}/../../packager/artifacts/openshift/openshift-install-linux.tar.gz"
         - "{{ playbook_dir }}/../../packager/artifacts/openshift/openshift-client-linux.tar.gz"
-      when: airgapped_mode | default(false) | bool
+      when:
+        - airgapped_mode | default(false) | bool
+        - not openshift_install_bin.stat.exists
       delegate_to: localhost
       run_once: true
 
@@ -57,6 +66,7 @@
       when:
         - not (airgapped_mode | default(false) | bool)
         - openshift_edition == "okd"
+        - not openshift_install_bin.stat.exists
       delegate_to: localhost
       run_once: true
 
@@ -72,24 +82,46 @@
       when:
         - not (airgapped_mode | default(false) | bool)
         - openshift_edition == "ocp"
+        - not openshift_install_bin.stat.exists
+      delegate_to: localhost
+      run_once: true
+
+    - name: Symlink OpenShift CLI binaries into /usr/bin for sudo secure_path compatibility
+      ansible.builtin.file:
+        src: "/usr/local/bin/{{ item }}"
+        dest: "/usr/bin/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - openshift-install
+        - oc
+        - kubectl
       delegate_to: localhost
       run_once: true
 
     # --------------------------------------------------------------------------
     # 3. Render install-config.yaml & agent-config.yaml and Build Agent ISO
     # --------------------------------------------------------------------------
+    - name: Check if Agent ISO and kubeconfig have already been generated
+      ansible.builtin.stat:
+        path: /opt/openiac-openshift/auth/kubeconfig
+      register: openshift_agent_kubeconfig
+      delegate_to: localhost
+      run_once: true
+
+    - name: Reset incomplete OpenShift Agent workspace before fresh ISO generation
+      ansible.builtin.file:
+        path: /opt/openiac-openshift
+        state: absent
+      when: not openshift_agent_kubeconfig.stat.exists
+      delegate_to: localhost
+      run_once: true
+
     - name: Ensure OpenShift Agent workspace directory exists
       ansible.builtin.file:
         path: /opt/openiac-openshift
         state: directory
         mode: "0750"
-      delegate_to: localhost
-      run_once: true
-
-    - name: Check if Agent ISO and kubeconfig have already been generated
-      ansible.builtin.stat:
-        path: /opt/openiac-openshift/auth/kubeconfig
-      register: openshift_agent_kubeconfig
       delegate_to: localhost
       run_once: true
 
@@ -127,6 +159,8 @@
 
     - name: Generate bootable OpenShift Agent ISO (agent.x86_64.iso) and auth credentials
       ansible.builtin.command: /usr/local/bin/openshift-install agent create image --dir=/opt/openiac-openshift
+      environment:
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       when: not openshift_agent_kubeconfig.stat.exists
       delegate_to: localhost
       run_once: true
@@ -149,5 +183,44 @@
         dest: /root/.kube/config
         remote_src: true
         mode: "0600"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Ensure .kube directory exists for ansible_user on bastion
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+      when:
+        - ansible_user is defined
+        - ansible_user != "root"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Copy generated OpenShift kubeconfig to ansible_user directory
+      ansible.builtin.copy:
+        src: /opt/openiac-openshift/auth/kubeconfig
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+      when:
+        - ansible_user is defined
+        - ansible_user != "root"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Export KUBECONFIG automatically in ansible_user .bashrc on bastion
+      ansible.builtin.lineinfile:
+        path: "/home/{{ ansible_user }}/.bashrc"
+        line: "export KUBECONFIG=~/.kube/config"
+        create: true
+        mode: "0644"
+      when:
+        - ansible_user is defined
+        - ansible_user != "root"
       delegate_to: localhost
       run_once: true
