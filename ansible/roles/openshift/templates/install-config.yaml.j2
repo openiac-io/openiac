@@ -3,6 +3,7 @@
 # ==============================================================================
 {% set total_masters = groups['openshift_control_plane'] | default(['cp-01']) | length %}
 {% set total_workers = groups['openshift_workers'] | default([]) | length %}
+{% set is_sno = (total_masters | int) < 3 %}
 apiVersion: v1
 baseDomain: {{ openshift_base_domain }}
 metadata:
@@ -11,12 +12,12 @@ compute:
   - architecture: amd64
     hyperthreading: Enabled
     name: worker
-    replicas: {{ total_workers }}
+    replicas: {{ 0 if is_sno else total_workers }}
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
   name: master
-  replicas: {{ total_masters }}
+  replicas: {{ 1 if is_sno else total_masters }}
 networking:
   clusterNetwork:
     - cidr: {{ openshift_cluster_network_cidr }}
@@ -26,7 +27,7 @@ networking:
   networkType: OVNKubernetes
   serviceNetwork:
     - {{ openshift_service_network_cidr }}
-{% if (total_masters | int) == 1 and (total_workers | int) == 0 %}
+{% if is_sno %}
 platform:
   none: {}
 {% else %}

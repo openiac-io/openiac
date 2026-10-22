@@ -1,8 +1,10 @@
 # ==============================================================================
-# OpenIaC Template: OpenShift / OKD agent-config.yaml (Agent-Based Standard)
+# OpenIaC Template: OpenIaC / OKD agent-config.yaml (Agent-Based Standard)
 # ==============================================================================
 # Automatically maps inventory nodes into static NMState network configurations
 # and designates the primary control-plane node as the self-bootstrapping Rendezvous Host.
+{% set total_masters = groups['openshift_control_plane'] | default(['cp-01']) | length %}
+{% set is_sno = (total_masters | int) < 3 %}
 
 apiVersion: v1beta1
 kind: AgentConfig
@@ -11,6 +13,7 @@ metadata:
 rendezvousIP: {{ openshift_rendezvous_ip }}
 hosts:
 {% for host in (groups['openshift_control_plane'] | default([])) %}
+{% if not is_sno or loop.first %}
   - hostname: {{ host }}
     role: master
     interfaces:
@@ -37,7 +40,9 @@ hosts:
             next-hop-address: {{ openshift_gateway_ip }}
             next-hop-interface: {{ openshift_network_interface }}
             table-id: 254
+{% endif %}
 {% endfor %}
+{% if not is_sno %}
 {% for host in (groups['openshift_workers'] | default([])) %}
   - hostname: {{ host }}
     role: worker
@@ -66,3 +71,4 @@ hosts:
             next-hop-interface: {{ openshift_network_interface }}
             table-id: 254
 {% endfor %}
+{% endif %}

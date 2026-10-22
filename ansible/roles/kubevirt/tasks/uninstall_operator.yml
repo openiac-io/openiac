@@ -24,6 +24,7 @@
       ansible.builtin.command: "kubectl delete -f /tmp/openiac-kubevirt-artifacts/{{ item }} --ignore-not-found=true"
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       loop:
         - cdi-cr.yaml
         - cdi-operator.yaml
@@ -41,6 +42,7 @@
       ansible.builtin.command: "kubectl delete -f {{ item }} --ignore-not-found=true"
       environment:
         KUBECONFIG: "{{ kubevirt_kubeconfig_path }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       loop:
         - "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ kubevirt_cdi_version }}/cdi-cr.yaml"
         - "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ kubevirt_cdi_version }}/cdi-operator.yaml"
@@ -56,8 +58,11 @@
     # --------------------------------------------------------------------------
     - name: Remove virtctl CLI binary from cluster management node
       ansible.builtin.file:
-        path: /usr/local/bin/virtctl
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /usr/local/bin/virtctl
+        - /usr/bin/virtctl
       when: inventory_hostname == kubevirt_target_node
 
   always:
