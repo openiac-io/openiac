@@ -4,7 +4,7 @@
 # Provides a zero-knowledge, user-friendly CLI interface for provisioning
 # on-premise and public cloud platforms with a single command.
 
-export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
+export ANSIBLE_CONFIG := /tmp/openiac-ansible.cfg
 export ANSIBLE_ROLES_PATH := $(CURDIR)/ansible/roles
 export ANSIBLE_HOST_KEY_CHECKING := False
 
@@ -46,6 +46,7 @@ help:
 # 0. Self-Healing Control Node Prerequisite Check
 # ------------------------------------------------------------------------------
 ensure-ansible:
+	@cp "$(CURDIR)/ansible/ansible.cfg" /tmp/openiac-ansible.cfg && chmod 0644 /tmp/openiac-ansible.cfg
 	@if ! command -v ansible-playbook >/dev/null 2>&1 || ! command -v sshpass >/dev/null 2>&1; then \
 		echo "===> [OpenIaC Self-Healing] 'ansible-playbook' or 'sshpass' not found on this control node."; \
 		echo "===> [OpenIaC Self-Healing] Automatically installing Ansible Engine & sshpass..."; \
