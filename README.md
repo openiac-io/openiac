@@ -1,8 +1,8 @@
-# OpenIaC — Hybrid Cloud & Container Platform Framework
+# OpenIaC — On-Premise & Air-Gapped Platform Framework
 
 [![OpenIaC CI Quality Gate](https://github.com/openiac-io/openiac/actions/workflows/ci.yml/badge.svg)](https://github.com/openiac-io/openiac/actions/workflows/ci.yml)
 
-**OpenIaC** is an enterprise-grade, 100% open-source Infrastructure as Code (IaC) framework designed to provision **Container, Cloud-Native Virtualization, and Private/Public Cloud Platforms** with a single command.
+**OpenIaC** is an enterprise-grade, 100% open-source Ansible IaC framework designed to provision **On-Premise Container, Cloud-Native Virtualization, and Private Cloud Platforms** on **RHEL / Rocky Linux** (online or air-gapped) with a single command.
 
 Built with a **Zero-Knowledge UX** philosophy and a **3-Layer Composable Stack Architecture**, OpenIaC abstracts away complex kernel tuning, agent-based ISO generation, Layer-3 operator lifecycles, and air-gapped dependency chains behind sensible defaults—allowing anyone to deploy and manage production-ready platforms effortlessly.
 
@@ -10,16 +10,15 @@ Built with a **Zero-Knowledge UX** philosophy and a **3-Layer Composable Stack A
 
 ## 🎯 Supported Tier-1 Platforms
 
-| Layer / Domain | Platform | Engine / Tech Stack | Air-gapped Ready | Entrypoint Command |
-| :--- | :--- | :--- | :---: | :--- |
-| **Layer-2 Container** | **`k8s`** | Upstream Kubernetes (`kubeadm` + `containerd` + `Calico`) | ✅ | `make k8s` |
-| **Layer-2 Container** | **`k3s`** | Lightweight Kubernetes (SUSE Rancher K3s) | ✅ | `make k3s` |
-| **Layer-2 Container** | **`openshift`** | Unified **OKD** & **Red Hat OCP** (`Agent-based Installer` 4.12+) | ✅ | `make openshift` |
-| **Layer-3 Virtualization** | **`kubevirt`** | Turnkey or Add-on VM Virtualization on K8s / K3s / OpenShift (`KubeVirt` + `CDI`) | ✅ | `make kubevirt` |
-| **Layer-2 Private Cloud** | **`openstack`** | Private Cloud IaaS (`Kolla-Ansible` Containerized) | ✅ | `make openstack` |
-| **Public Cloud (AWS)** | **`aws`** | Amazon EKS All-in-One Production Platform | — | `make aws-apply` |
-| **Public Cloud (GCP)** | **`gcp`** | Google Kubernetes Engine (GKE) Production Platform | — | `make gcp-apply` |
-| **Public Cloud (Azure)** | **`azure`** | Azure Kubernetes Service (AKS) Production Platform | — | `make azure-apply` |
+| Layer / Domain | Platform | Engine / Tech Stack | Air-gapped Ready | Entrypoint Command | Verification Status |
+| :--- | :--- | :--- | :---: | :--- | :--- |
+| **Layer-2 Container** | **`k8s`** | Upstream Kubernetes (`kubeadm` + `containerd` + `Calico`) | ✅ | `make k8s` | CI Validated / Lab Verification In Progress |
+| **Layer-2 Container** | **`k3s`** | Lightweight Kubernetes (SUSE Rancher K3s) | ✅ | `make k3s` | Verified (Local Vagrant) |
+| **Layer-2 Container** | **`openshift`** | Unified **OKD** & **Red Hat OCP** (`Agent-based Installer` 4.12+) | ✅ | `make openshift` | CI Validated / Lab Verification In Progress |
+| **Layer-3 Virtualization** | **`kubevirt`** | Turnkey or Add-on VM Virtualization on K8s / K3s / OpenShift (`KubeVirt` + `CDI`) | ✅ | `make kubevirt` | CI Validated / Lab Verification In Progress |
+| **Layer-2 Private Cloud** | **`openstack`** | Private Cloud IaaS (`Kolla-Ansible` Containerized) | ✅ | `make openstack` | CI Validated / Lab Verification In Progress |
+
+> *Note: `make validate` and GitHub Actions CI statically verify all Ansible playbooks, Jinja2 templates, and Bash packagers across every platform, while live multi-node Vagrant runtime verification is tracked honestly per platform above.*
 
 ---
 
@@ -27,16 +26,12 @@ Built with a **Zero-Knowledge UX** philosophy and a **3-Layer Composable Stack A
 
 ```text
 openiac/
-├── .github/workflows/ci.yml # Automated CI Quality Gate (Ansible, Jinja2, Bash, Terraform)
+├── .github/workflows/ci.yml # Automated CI Quality Gate (Ansible, Jinja2, Bash)
 ├── Makefile                 # One-command CLI entrypoint for deployment & lifecycle actions
 ├── ansible/                 # On-Premise & Private Cloud Automation (RHEL / Rocky Linux)
 │   ├── inventories/         # Pre-configured sample topologies (k3s, k8s, openshift, openstack)
 │   ├── playbooks/           # Standalone, turnkey, and template validation playbooks
 │   └── roles/               # Pluggable lifecycle roles (base_os, k3s, k8s, openshift, kubevirt, openstack)
-├── terraform/               # Public Cloud Production Blueprints (HCL)
-│   ├── aws/                 # Multi-AZ VPC + Amazon EKS + Managed Node Group
-│   ├── gcp/                 # Dedicated VPC + Google GKE + Managed Node Pool
-│   └── azure/               # VNet + Azure AKS + Managed Identity
 ├── packager/                # Modular Air-gapped Artifact Bundler (RPMs, Wheels, Images)
 └── vagrant/                 # Local multi-node testbeds on VirtualBox (Rocky Linux)
 ```
@@ -90,22 +85,8 @@ make pack-kubevirt
 make pack-openstack
 ```
 
-### 4. Public Cloud Provisioning (Terraform)
-All public cloud modules come with sensible defaults. Authenticate with your cloud CLI and run:
-
-```bash
-# Provision Amazon EKS on AWS
-make aws-apply
-
-# Provision Google GKE on GCP
-make gcp-apply
-
-# Provision Azure AKS on Azure
-make azure-apply
-```
-
-### 5. Automated Code & Schema Validation
-Validate all Ansible playbooks, Jinja2 template renderings, Bash packager scripts, and Terraform HCL schemas with a single command:
+### 4. Automated Code & Schema Validation
+Validate all Ansible playbooks, Jinja2 template renderings, and Bash packager scripts with a single command:
 
 ```bash
 make validate
