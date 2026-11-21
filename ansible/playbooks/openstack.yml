@@ -7,4 +7,9 @@
   become: true
   roles:
     - role: base_os
+      vars:
+        # Upstream Kolla-Ansible bootstrap-servers defaults to permissive SELinux
+        # for container named-volume relabeling while keeping firewalld enabled.
+        base_os_selinux_mode: "permissive"
+        base_os_firewalld_enabled: true
     - role: openstack

@@ -7,6 +7,8 @@
   become: true
   roles:
     - role: base_os
+      vars:
+        base_os_firewalld_ports: "{{ ['5000/tcp'] if (airgapped_mode | default(false) | bool) else [] }}"
     - role: openshift
     - role: kubevirt
       when: enable_kubevirt_addon | default(false) | bool

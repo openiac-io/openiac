@@ -17,6 +17,10 @@ enable_cinder_backend_lvm: "yes"
 enable_horizon: "yes"
 enable_neutron_provider_networks: "yes"
 
+# Firewall Baseline (Keep firewalld active and manage external API ports)
+disable_firewall: "no"
+enable_external_api_firewalld: "yes"
+
 # Air-gapped Support
 {% if airgapped_mode | default(false) | bool %}
 docker_registry: "{{ local_registry | default('localhost:5000') }}"

@@ -1,0 +1,18 @@
+---
+# ==============================================================================
+# OpenIaC Ansible Role Defaults: Base OS Security & Firewall Baseline
+# ==============================================================================
+# Enforces Enterprise Linux security baselines by default (SELinux enforcing
+# and firewalld active with explicit least-privilege ports).
+
+# SELinux baseline mode: "enforcing" (default) or "permissive" (never disabled)
+base_os_selinux_mode: "enforcing"
+
+# Keep firewalld running and enabled by default
+base_os_firewalld_enabled: true
+
+# Explicit TCP/UDP ports opened in firewalld (e.g., ["6443/tcp", "8472/udp"])
+base_os_firewalld_ports: []
+
+# Trusted CIDR ranges allowed in firewalld trusted zone for container overlays
+base_os_firewalld_trusted_sources: []
