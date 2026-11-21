@@ -49,28 +49,81 @@
 # ------------------------------------------------------------------------------
 # 4. Security & Firewall Baseline
 # ------------------------------------------------------------------------------
-- name: Set SELinux to permissive mode at runtime
-  ansible.builtin.command: setenforce 0
+- name: "[Pre-flight] Validate base_os_selinux_mode is enforcing or permissive"
+  ansible.builtin.assert:
+    that:
+      - base_os_selinux_mode in ["enforcing", "permissive"]
+    fail_msg: >-
+      Unsupported SELinux mode '{{ base_os_selinux_mode }}'.
+      OpenIaC only allows 'enforcing' or 'permissive' (never disabled).
+    success_msg: "Validated SELinux security baseline mode: {{ base_os_selinux_mode }}"
+
+- name: "Ensure SELinux runtime mode matches baseline ({{ base_os_selinux_mode }})"
+  ansible.builtin.command: "setenforce {{ 1 if base_os_selinux_mode == 'enforcing' else 0 }}"
   when:
     - ansible_selinux is defined
-    - ansible_selinux.status == "enabled"
-    - ansible_selinux.mode == "enforcing"
+    - ansible_selinux.status | default('disabled') == "enabled"
+    - ansible_selinux.mode | default('') != base_os_selinux_mode
   changed_when: true
-  failed_when: false
 
-- name: Persist SELinux permissive mode in /etc/selinux/config
+- name: Check whether /etc/selinux/config exists
+  ansible.builtin.stat:
+    path: /etc/selinux/config
+  register: base_os_selinux_config_file
+
+- name: "Persist SELinux baseline mode ({{ base_os_selinux_mode }}) in /etc/selinux/config"
   ansible.builtin.lineinfile:
     path: /etc/selinux/config
     regexp: '^SELINUX='
-    line: 'SELINUX=permissive'
+    line: "SELINUX={{ base_os_selinux_mode }}"
+  when: base_os_selinux_config_file.stat.exists
+
+- name: Check whether firewall-cmd is available on target host
+  ansible.builtin.command: which firewall-cmd
+  register: base_os_firewalld_bin
+  changed_when: false
   failed_when: false
 
-- name: Ensure firewalld service is stopped and disabled
+- name: Configure and enable firewalld with least-privilege rules
+  when:
+    - base_os_firewalld_enabled | bool
+    - base_os_firewalld_bin.rc == 0
+  block:
+    - name: Ensure firewalld service is started and enabled
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Open required platform ports in firewalld
+      ansible.builtin.shell: >-
+        firewall-cmd --permanent --query-port='{{ item }}' ||
+        (firewall-cmd --permanent --add-port='{{ item }}' && echo CHANGED)
+      loop: "{{ base_os_firewalld_ports }}"
+      register: base_os_firewalld_port_results
+      changed_when: "'CHANGED' in (base_os_firewalld_port_results.stdout | default(''))"
+
+    - name: Allow container overlay CIDRs in firewalld trusted zone
+      ansible.builtin.shell: >-
+        firewall-cmd --permanent --zone=trusted --query-source='{{ item }}' ||
+        (firewall-cmd --permanent --zone=trusted --add-source='{{ item }}' && echo CHANGED)
+      loop: "{{ base_os_firewalld_trusted_sources }}"
+      register: base_os_firewalld_source_results
+      changed_when: "'CHANGED' in (base_os_firewalld_source_results.stdout | default(''))"
+
+    - name: Reload firewalld to apply permanent rules
+      ansible.builtin.command: firewall-cmd --reload
+      when: (base_os_firewalld_port_results is changed) or (base_os_firewalld_source_results is changed)
+      changed_when: true
+
+- name: Stop and disable firewalld only when explicitly opted out
   ansible.builtin.systemd:
     name: firewalld
     state: stopped
     enabled: false
-  failed_when: false
+  when:
+    - not (base_os_firewalld_enabled | bool)
+    - base_os_firewalld_bin.rc == 0
 
 # ------------------------------------------------------------------------------
 # 5. Kernel Modules & Network Sysctl Tuning

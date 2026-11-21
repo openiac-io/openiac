@@ -7,6 +7,15 @@
   become: true
   roles:
     - role: base_os
+      vars:
+        base_os_firewalld_ports:
+          - "6443/tcp"
+          - "10250/tcp"
+          - "8472/udp"
+          - "2379-2380/tcp"
+        base_os_firewalld_trusted_sources:
+          - "10.42.0.0/16"
+          - "10.43.0.0/16"
     - role: k3s
     - role: kubevirt
       when: enable_kubevirt_addon | default(false) | bool

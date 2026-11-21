@@ -40,6 +40,20 @@
   become: true
   roles:
     - role: base_os
+      vars:
+        base_os_firewalld_ports:
+          - "6443/tcp"
+          - "2379-2380/tcp"
+          - "10250/tcp"
+          - "10257/tcp"
+          - "10259/tcp"
+          - "30000-32767/tcp"
+          - "179/tcp"
+          - "4789/udp"
+          - "5473/tcp"
+        base_os_firewalld_trusted_sources:
+          - "{{ k8s_pod_network_cidr | default('192.168.0.0/16') }}"
+          - "10.96.0.0/12"
       when:
         - (kubevirt_state | default('present')) == 'present'
         - not (openiac_cluster_exists | default(false) | bool)
